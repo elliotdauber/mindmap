@@ -1,9 +1,7 @@
 import "./globals.css";
-import type { Metadata } from "next";
 
-export const metadata: Metadata = {
+export const metadata = {
   title: "Mind Map",
-  description: "Knowledge Graph",
 };
 
 export default function RootLayout({

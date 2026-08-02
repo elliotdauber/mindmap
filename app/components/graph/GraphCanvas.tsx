@@ -4,102 +4,110 @@ import "@xyflow/react/dist/style.css";
 
 import {
   ReactFlow,
-  ReactFlowProvider,
   Background,
+  BackgroundVariant,
   Controls,
   MiniMap,
-  useNodesState,
-  useEdgesState,
-  addEdge,
-  Connection,
 } from "@xyflow/react";
 
-import { useCallback } from "react";
-import ContentNode from "./ContentNode";
+import ContentNode from "./nodes/ContentNode";
+import ConceptNode from "./nodes/ConceptNode";
+import RelationshipEdge from "./edges/RelationshipEdge";
+import { autoLayout } from "./layout/autoLayout";
 
 const nodeTypes = {
   content: ContentNode,
+  concept: ConceptNode,
 };
 
-const initialNodes = [
+const edgeTypes = {
+  relationship: RelationshipEdge,
+};
+
+const rawNodes = [
   {
     id: "1",
     type: "content",
-    position: {
-      x: 100,
-      y: 100,
-    },
     data: {
-      title: "Apple",
-      content: "A sweet fruit.",
+      title: "Some Book",
+      body: "Book about stuff.",
     },
   },
+
   {
     id: "2",
     type: "content",
-    position: {
-      x: 500,
-      y: 250,
-    },
     data: {
-      title: "Fruit",
-      content: "Edible plant structure.",
+      title: "Some Other Book",
+      body: "Another book about stuff.",
     },
   },
-];
 
-const initialEdges = [
   {
-    id: "e1",
-    source: "1",
-    target: "2",
-    label: "is a",
+    id: "3",
+    type: "concept",
+    data: {
+      title: "Some concept",
+    },
   },
 ];
 
-function Flow() {
-  const [nodes, setNodes, onNodesChange] =
-    useNodesState(initialNodes);
+const rawEdges = [
+  {
+    id: "1-3",
+    source: "1",
+    target: "3",
+    type: "relationship",
+  },
 
-  const [edges, setEdges, onEdgesChange] =
-    useEdgesState(initialEdges);
+  {
+    id: "2-3",
+    source: "2",
+    target: "3",
+    type: "relationship",
+  },
+];
 
-  const onConnect = useCallback(
-    (connection: Connection) => {
-      setEdges((eds) =>
-        addEdge(
-          {
-            ...connection,
-            label: "relationship",
-          },
-          eds
-        )
-      );
-    },
-    [setEdges]
-  );
-
-  return (
-    <ReactFlow
-      fitView
-      nodes={nodes}
-      edges={edges}
-      nodeTypes={nodeTypes}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      onConnect={onConnect}
-    >
-      <Background gap={24} />
-      <MiniMap />
-      <Controls />
-    </ReactFlow>
-  );
-}
+const nodes = autoLayout(rawNodes, rawEdges);
 
 export default function GraphCanvas() {
   return (
-    <ReactFlowProvider>
-      <Flow />
-    </ReactFlowProvider>
+    <div className="h-full w-full">
+      <ReactFlow
+        nodes={nodes}
+
+        edges={rawEdges}
+
+        nodeTypes={nodeTypes}
+
+        edgeTypes={edgeTypes}
+
+        nodesDraggable={false}
+
+        nodesConnectable={false}
+
+        fitView
+      >
+        <Background
+          variant={BackgroundVariant.Dots}
+
+          gap={24}
+
+          size={1}
+
+          color="#ddd6ce"
+        />
+
+        <MiniMap
+          nodeColor={(node) => {
+            if (node.type === "concept") return "#fed7aa";
+
+            return "#ffffff";
+          }}
+        />
+
+        <Controls />
+      </ReactFlow>
+    </div>
   );
 }

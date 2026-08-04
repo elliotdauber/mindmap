@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { Edge, Node } from "@xyflow/react";
+import type { Connection, Edge, Node } from "@xyflow/react";
 import { createClient } from "@/lib/supabase/client";
 import type {
   DbEdge,
@@ -48,7 +48,7 @@ type GraphProviderProps = {
     edges: Edge[];
     setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
     setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
-    onEdge: (edge: Edge) => void;
+    onEdge: (edge: Connection) => void;
     onNodesDelete: (deleted: Node[]) => void;
     onEdgesDelete: (deleted: Edge[]) => void;
   }) => ReactNode;
@@ -226,7 +226,7 @@ export function GraphProvider({
   );
 
   const onEdge = useCallback(
-    (edge: Edge) => {
+    (edge: Connection) => {
       if (!edge.source || !edge.target) return;
       void addEdge(edge.source, edge.target);
     },

@@ -15,6 +15,7 @@ import {
   type Node,
   type NodeChange,
   type EdgeChange,
+  Connection,
 } from "@xyflow/react";
 
 import ContentNode from "./nodes/ContentNode";
@@ -135,7 +136,7 @@ function GraphFlow({
   edges: Edge[];
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
-  onEdge: (edge: Edge) => void;
+  onEdge: (edge: Connection) => void;
   onNodesDelete: (deleted: Node[]) => void;
   onEdgesDelete: (deleted: Edge[]) => void;
 }) {

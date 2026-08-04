@@ -1,6 +1,12 @@
 "use client";
 
-import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath } from "@xyflow/react";
+import {
+  BaseEdge,
+  EdgeLabelRenderer,
+  getSmoothStepPath,
+  type EdgeProps,
+} from "@xyflow/react";
+import { useGraph } from "../graph-context";
 
 export default function RelationshipEdge({
   id,
@@ -8,8 +14,10 @@ export default function RelationshipEdge({
   sourceY,
   targetX,
   targetY,
-  label,
-}: any) {
+  selected,
+}: EdgeProps) {
+  const { deleteEdge } = useGraph();
+
   const [path, labelX, labelY] = getSmoothStepPath({
     sourceX,
     sourceY,
@@ -23,21 +31,26 @@ export default function RelationshipEdge({
         id={id}
         path={path}
         style={{
-          stroke: "#d6c7b8",
-          strokeWidth: 2,
+          stroke: selected ? "#a8a29e" : "#d6c7b8",
+          strokeWidth: selected ? 3 : 2,
         }}
       />
 
-      {label && (
+      {selected && (
         <EdgeLabelRenderer>
-          <div
+          <button
+            type="button"
             style={{
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
             }}
-            className="absolute rounded-full border border-orange-200 bg-[#fff7ed] px-3 py-1 text-xs text-orange-700"
+            onClick={() => void deleteEdge(id)}
+            className="nodrag nopan absolute flex h-6 w-6 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-500 shadow-sm transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+            title="Remove connection"
           >
-            {label}
-          </div>
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
+              <path d="M2 5h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </button>
         </EdgeLabelRenderer>
       )}
     </>

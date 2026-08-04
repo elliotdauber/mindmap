@@ -15,3 +15,14 @@ export const ConceptNode = Schema.Struct({
 });
 
 export type ConceptNode = typeof ConceptNode.Type;
+
+export const DisplayedNode = Schema.Struct({
+  id: Schema.String,
+  type: Schema.Literals(['content', 'concept']),
+  data: Schema.Struct({
+    title: Schema.String,
+    body: Schema.optional(Schema.String)
+  })
+});
+
+export type DisplayedNode = typeof DisplayedNode.Type;

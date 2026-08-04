@@ -9,4 +9,15 @@ body {
 
 body {
   background: #faf7f2;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.react-flow__edge-path {
+  stroke-linecap: round;
 }

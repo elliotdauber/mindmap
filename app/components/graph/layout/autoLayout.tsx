@@ -1,6 +1,7 @@
+import type { DisplayedNode, GraphEdge } from "@/lib/types/graph";
 import dagre from "dagre";
 
-export function autoLayout(nodes: any[], edges: any[]) {
+export function autoLayout(nodes: DisplayedNode[], edges: GraphEdge[]) {
   const graph = new dagre.graphlib.Graph();
 
   graph.setDefaultEdgeLabel(() => ({}));
@@ -14,7 +15,6 @@ export function autoLayout(nodes: any[], edges: any[]) {
   nodes.forEach((node) => {
     graph.setNode(node.id, {
       width: node.type === "concept" ? 160 : 260,
-
       height: node.type === "concept" ? 50 : 140,
     });
   });
@@ -32,7 +32,6 @@ export function autoLayout(nodes: any[], edges: any[]) {
       ...node,
       position: {
         x: position.x - position.width / 2,
-
         y: position.y - position.height / 2,
       },
     };

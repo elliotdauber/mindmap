@@ -299,6 +299,44 @@ body {
   transition: opacity 0.14s ease;
 }
 
+.react-flow__node.is-pulsing .node-shell {
+  animation: node-pulse 1.1s ease-out 2;
+}
+
+@keyframes node-pulse {
+  0% {
+    filter: drop-shadow(0 0 0 rgba(230, 119, 0, 0));
+  }
+  35% {
+    filter: drop-shadow(0 0 16px rgba(230, 119, 0, 0.45));
+  }
+  100% {
+    filter: drop-shadow(0 0 0 rgba(230, 119, 0, 0));
+  }
+}
+
+.search-scrim {
+  background: rgba(26, 26, 26, 0.12);
+}
+
+.search-palette {
+  animation: rise-in 0.22s ease both;
+}
+
+.search-results-scroll {
+  padding-left: 2px;
+  padding-right: 2px;
+}
+
+.search-results-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.search-results-scroll::-webkit-scrollbar-thumb {
+  border-radius: 4px;
+  background: var(--stroke-light);
+}
+
 /* ─────────────  motion  ───────────── */
 
 .rise-in {

@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { DbEdge, DbNode, GraphEdge, NodeType } from "@/lib/types/graph";
 import { dbEdgeToEdge, dbNodeToDisplayed, normalizeEdges } from "@/lib/graph/transform";
 import { routeEdges, type Rect } from "@/lib/graph/route";
+import { UNDO_LIMIT, type UndoEntry } from "@/lib/graph/undo";
 import {
   NODE_HEIGHT,
   NODE_WIDTH,
@@ -29,6 +30,7 @@ export type GraphNode = {
 };
 
 type GraphContextValue = {
+  nodes: GraphNode[];
   nodeCount: number;
   edgeCount: number;
   isBusy: boolean;
@@ -43,19 +45,26 @@ type GraphContextValue = {
   openNode: GraphNode | null;
   openNodeNeighbours: GraphNode[];
   viewportFocusId: string | null;
+  pulseNodeId: string | null;
+  searchOpen: boolean;
+  canUndo: boolean;
   addNode: (type: NodeType) => Promise<void>;
   updateNode: (
     id: string,
     updates: { title?: string; body?: string },
   ) => Promise<void>;
-  deleteNode: (id: string) => Promise<void>;
-  deleteEdge: (id: string) => Promise<void>;
+  deleteNode: (id: string, options?: { skipUndo?: boolean }) => Promise<void>;
+  deleteEdge: (id: string, options?: { skipUndo?: boolean }) => Promise<void>;
   deleteSelection: () => void;
   startLink: (id: string, leaving?: { title: string; body: string }) => void;
   cancelLink: () => void;
   open: (id: string, leaving?: { title: string; body: string }) => void;
   close: (snapshot?: { title: string; body: string }) => void;
   consumeViewportFocus: () => void;
+  jumpToNode: (id: string) => void;
+  openSearch: () => void;
+  closeSearch: () => void;
+  undo: () => Promise<void>;
 };
 
 const GraphContext = createContext<GraphContextValue | null>(null);
@@ -134,6 +143,9 @@ export function GraphProvider({
   const [linkSourceId, setLinkSourceId] = useState<string | null>(null);
   const [openNodeId, setOpenNodeId] = useState<string | null>(null);
   const [viewportFocusId, setViewportFocusId] = useState<string | null>(null);
+  const [pulseNodeId, setPulseNodeId] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [canUndo, setCanUndo] = useState(false);
 
   const nodesRef = useRef(nodes);
   const edgesRef = useRef(edges);
@@ -142,6 +154,16 @@ export function GraphProvider({
   const linkSourceRef = useRef(linkSourceId);
   const openNodeIdRef = useRef(openNodeId);
   const draftNodeIdsRef = useRef(new Set<string>());
+  const undoStackRef = useRef<UndoEntry[]>([]);
+  const pulseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const pushUndo = useCallback((entry: UndoEntry) => {
+    undoStackRef.current.push(entry);
+    if (undoStackRef.current.length > UNDO_LIMIT) {
+      undoStackRef.current.shift();
+    }
+    setCanUndo(true);
+  }, []);
 
   nodesRef.current = nodes;
   edgesRef.current = edges;
@@ -223,6 +245,30 @@ export function GraphProvider({
     setViewportFocusId(null);
   }, []);
 
+  const openSearch = useCallback(() => {
+    setSearchOpen(true);
+    setLinkSourceId(null);
+  }, []);
+
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false);
+  }, []);
+
+  const jumpToNode = useCallback((id: string) => {
+    if (!nodesRef.current.some((node) => node.id === id)) return;
+
+    setSearchOpen(false);
+    setOpenNodeId(null);
+    setSelectedNodeId(id);
+    setSelectedEdgeId(null);
+    setLinkSourceId(null);
+    setViewportFocusId(id);
+    setPulseNodeId(id);
+
+    if (pulseTimerRef.current) clearTimeout(pulseTimerRef.current);
+    pulseTimerRef.current = setTimeout(() => setPulseNodeId(null), 1800);
+  }, []);
+
   const addNode = useCallback(
     async (type: NodeType) => {
       setIsBusy(true);
@@ -242,12 +288,20 @@ export function GraphProvider({
       }
 
       const created = dbNodeToDisplayed(data as DbNode);
+      const createdNode: GraphNode = {
+        id: created.id,
+        type: created.type,
+        title: created.data.title,
+        body: created.data.body ?? "",
+      };
 
       const sourceType = linkFrom
         ? nodesRef.current.find((node) => node.id === linkFrom)?.type
         : undefined;
       const autoLink =
         Boolean(linkFrom) && !(sourceType === "content" && type === "content");
+
+      let createdEdge: GraphEdge | undefined;
 
       if (autoLink && linkFrom && linkFrom !== created.id) {
         const { data: edgeRow, error: edgeError } = await supabase
@@ -263,6 +317,7 @@ export function GraphProvider({
           const ids = new Set(nodesRef.current.map((node) => node.id));
 
           if (ids.has(edge.source) && ids.has(edge.target)) {
+            createdEdge = edge;
             setEdges((current) => normalizeEdges(ids, [...current, edge]));
           } else {
             // The card was discarded before the auto-link finished.
@@ -271,17 +326,10 @@ export function GraphProvider({
         }
       }
 
-      setNodes((current) => [
-        ...current,
-        {
-          id: created.id,
-          type: created.type,
-          title: created.data.title,
-          body: created.data.body ?? "",
-        },
-      ]);
+      setNodes((current) => [...current, createdNode]);
 
       draftNodeIdsRef.current.add(created.id);
+      pushUndo({ type: "add-node", node: createdNode, edge: createdEdge });
 
       setSelectedNodeId(created.id);
       setSelectedEdgeId(null);
@@ -290,7 +338,7 @@ export function GraphProvider({
       setViewportFocusId(created.id);
       setIsBusy(false);
     },
-    [supabase],
+    [pushUndo, supabase],
   );
 
   const updateNode = useCallback(
@@ -320,11 +368,21 @@ export function GraphProvider({
   );
 
   const deleteNode = useCallback(
-    async (id: string) => {
+    async (id: string, options?: { skipUndo?: boolean }) => {
       const previousNodes = nodesRef.current;
       const previousEdges = edgesRef.current;
+      const node = previousNodes.find((candidate) => candidate.id === id);
+      if (!node) return;
 
-      setNodes(previousNodes.filter((node) => node.id !== id));
+      const connectedEdges = previousEdges.filter(
+        (edge) => edge.source === id || edge.target === id,
+      );
+
+      if (!options?.skipUndo) {
+        pushUndo({ type: "delete-node", node, edges: connectedEdges });
+      }
+
+      setNodes(previousNodes.filter((candidate) => candidate.id !== id));
       setEdges(
         normalizeEdges(
           new Set(previousNodes.filter((node) => node.id !== id).map((node) => node.id)),
@@ -347,13 +405,20 @@ export function GraphProvider({
         setEdges(previousEdges);
       }
     },
-    [supabase],
+    [pushUndo, supabase],
   );
 
   const deleteEdge = useCallback(
-    async (id: string) => {
+    async (id: string, options?: { skipUndo?: boolean }) => {
       const previousEdges = edgesRef.current;
-      setEdges(previousEdges.filter((edge) => edge.id !== id));
+      const edge = previousEdges.find((candidate) => candidate.id === id);
+      if (!edge) return;
+
+      if (!options?.skipUndo) {
+        pushUndo({ type: "delete-edge", edge });
+      }
+
+      setEdges(previousEdges.filter((candidate) => candidate.id !== id));
 
       if (selectedEdgeRef.current === id) setSelectedEdgeId(null);
 
@@ -364,7 +429,7 @@ export function GraphProvider({
         setEdges(previousEdges);
       }
     },
-    [supabase],
+    [pushUndo, supabase],
   );
 
   const finalizeEditor = useCallback(
@@ -378,7 +443,11 @@ export function GraphProvider({
 
       if (draftNodeIdsRef.current.has(openId) && !title && !body) {
         draftNodeIdsRef.current.delete(openId);
-        void deleteNode(openId);
+        undoStackRef.current = undoStackRef.current.filter(
+          (entry) => !(entry.type === "add-node" && entry.node.id === openId),
+        );
+        setCanUndo(undoStackRef.current.length > 0);
+        void deleteNode(openId, { skipUndo: true });
         return;
       }
 
@@ -467,14 +536,17 @@ export function GraphProvider({
         return;
       }
 
+      const edge = dbEdgeToEdge(data as DbEdge);
+      pushUndo({ type: "add-edge", edge });
+
       setEdges((current) =>
         normalizeEdges(
           new Set(nodesRef.current.map((node) => node.id)),
-          [...current, dbEdgeToEdge(data as DbEdge)],
+          [...current, edge],
         ),
       );
     },
-    [supabase],
+    [pushUndo, supabase],
   );
 
   const onNodeClick = useCallback(
@@ -513,6 +585,99 @@ export function GraphProvider({
     setLinkSourceId(null);
   }, []);
 
+  const undo = useCallback(async () => {
+    const entry = undoStackRef.current.pop();
+    if (!entry) {
+      setCanUndo(false);
+      return;
+    }
+
+    setCanUndo(undoStackRef.current.length > 0);
+
+    switch (entry.type) {
+      case "add-node": {
+        await deleteNode(entry.node.id, { skipUndo: true });
+        break;
+      }
+
+      case "delete-node": {
+        const { error } = await supabase.from("nodes").insert({
+          id: entry.node.id,
+          type: entry.node.type,
+          title: entry.node.title,
+          body: entry.node.body,
+        });
+
+        if (error) {
+          console.error(error);
+          pushUndo(entry);
+          return;
+        }
+
+        setNodes((current) => [...current, entry.node]);
+
+        const restoredIds = new Set([
+          ...nodesRef.current.map((node) => node.id),
+          entry.node.id,
+        ]);
+
+        if (entry.edges.length > 0) {
+          const { error: edgeError } = await supabase.from("edges").insert(
+            entry.edges.map((edge) => ({
+              id: edge.id,
+              from_node_id: edge.source,
+              to_node_id: edge.target,
+            })),
+          );
+
+          if (edgeError) {
+            console.error(edgeError);
+          } else {
+            setEdges((current) =>
+              normalizeEdges(restoredIds, [...current, ...entry.edges]),
+            );
+          }
+        }
+
+        setSelectedNodeId(entry.node.id);
+        setViewportFocusId(entry.node.id);
+        break;
+      }
+
+      case "add-edge": {
+        await deleteEdge(entry.edge.id, { skipUndo: true });
+        break;
+      }
+
+      case "delete-edge": {
+        const { data, error } = await supabase
+          .from("edges")
+          .insert({
+            id: entry.edge.id,
+            from_node_id: entry.edge.source,
+            to_node_id: entry.edge.target,
+          })
+          .select()
+          .single();
+
+        if (error || !data) {
+          console.error(error);
+          pushUndo(entry);
+          return;
+        }
+
+        const edge = dbEdgeToEdge(data as DbEdge);
+        setEdges((current) =>
+          normalizeEdges(
+            new Set(nodesRef.current.map((node) => node.id)),
+            [...current, edge],
+          ),
+        );
+        break;
+      }
+    }
+  }, [deleteEdge, deleteNode, pushUndo, supabase]);
+
   const deleteSelection = useCallback(() => {
     if (selectedEdgeRef.current) {
       void deleteEdge(selectedEdgeRef.current);
@@ -535,12 +700,13 @@ export function GraphProvider({
         width: NODE_WIDTH,
         height: NODE_HEIGHT,
         data: { title: node.title, body: node.body },
+        className: node.id === pulseNodeId ? "is-pulsing" : undefined,
         selected: node.id === selectedNodeId,
         draggable: false,
         connectable: false,
         deletable: false,
       })),
-    [nodes, positions, selectedNodeId],
+    [nodes, positions, pulseNodeId, selectedNodeId],
   );
 
   const flowEdges = useMemo<Edge[]>(
@@ -590,6 +756,7 @@ export function GraphProvider({
 
   const value = useMemo<GraphContextValue>(
     () => ({
+      nodes,
       nodeCount: nodes.length,
       edgeCount: links.length,
       isBusy,
@@ -603,6 +770,9 @@ export function GraphProvider({
       openNode,
       openNodeNeighbours,
       viewportFocusId,
+      pulseNodeId,
+      searchOpen,
+      canUndo,
       addNode,
       updateNode,
       deleteNode,
@@ -613,15 +783,22 @@ export function GraphProvider({
       open,
       close,
       consumeViewportFocus,
+      jumpToNode,
+      openSearch,
+      closeSearch,
+      undo,
     }),
     [
       addNode,
       cancelLink,
+      canUndo,
       close,
+      closeSearch,
       consumeViewportFocus,
       deleteEdge,
       deleteNode,
       deleteSelection,
+      jumpToNode,
       links.length,
       hasLinkTargets,
       isBusy,
@@ -629,12 +806,16 @@ export function GraphProvider({
       isSettling,
       linkSourceId,
       linkSourceType,
-      nodes.length,
+      nodes,
       open,
       openNode,
       openNodeNeighbours,
+      openSearch,
+      pulseNodeId,
+      searchOpen,
       selectedNodeId,
       startLink,
+      undo,
       updateNode,
       viewportFocusId,
     ],

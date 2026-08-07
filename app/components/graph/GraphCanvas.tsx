@@ -20,6 +20,7 @@ import ConceptNode from "./nodes/ConceptNode";
 import ContentNode from "./nodes/ContentNode";
 import RelationshipEdge from "./edges/RelationshipEdge";
 import { NodeEditor } from "./NodeEditor";
+import { SearchPalette } from "./SearchPalette";
 import { GraphProvider, useGraph } from "./graph-context";
 import LogoutButton from "@/components/auth/LogoutButton";
 import type { DbEdge, DbNode, NodeType } from "@/lib/types/graph";
@@ -66,8 +67,7 @@ function Wordmark() {
         <p className="mt-0.5 text-[11px] text-[var(--ink-faint)]">
           {nodeCount === 0
             ? "empty canvas"
-            : `${nodeCount} ${nodeCount === 1 ? "node" : "nodes"} · ${edgeCount} ${edgeCount === 1 ? "link" : "links"
-            }`}
+            : `${nodeCount} ${nodeCount === 1 ? "node" : "nodes"} · ${edgeCount} ${edgeCount === 1 ? "link" : "links"}`}
         </p>
       </div>
     </div>
@@ -182,7 +182,7 @@ function CommandBar() {
         </div>
 
         <p className="font-hand text-[14px] text-[var(--ink-faint)]">
-          double-click to open · content links through concepts
+          ⌘K search · ⌘Z undo · double-click to open
         </p>
       </div>
     </Panel>
@@ -365,27 +365,58 @@ function Shortcuts({ onClearSelection }: { onClearSelection: () => void }) {
   const {
     addNode,
     cancelLink,
+    canUndo,
+    closeSearch,
     deleteSelection,
     hasLinkTargets,
     isBusy,
     isLinking,
     open,
     openNode,
+    openSearch,
+    searchOpen,
     selectedNodeId,
     startLink,
+    undo,
   } = useGraph();
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (isTypingTarget(event.target)) {
+      const typing = isTypingTarget(event.target);
+      const mod = event.metaKey || event.ctrlKey;
+
+      if (mod && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        if (searchOpen) closeSearch();
+        else openSearch();
+        return;
+      }
+
+      if (mod && event.key.toLowerCase() === "z" && !event.shiftKey) {
+        if (typing) return;
+        if (!canUndo) return;
+        event.preventDefault();
+        void undo();
+        return;
+      }
+
+      if (typing) {
         if (event.key === "Escape") (event.target as HTMLElement).blur();
         return;
       }
+
+      if (searchOpen) return;
 
       if (event.metaKey || event.ctrlKey || event.altKey) return;
 
       // The expanded editor owns the keyboard while it's open.
       if (openNode) return;
+
+      if (event.key === "/" && !isBusy && !isLinking) {
+        event.preventDefault();
+        openSearch();
+        return;
+      }
 
       if (event.key === "Enter" && selectedNodeId) {
         event.preventDefault();
@@ -433,6 +464,8 @@ function Shortcuts({ onClearSelection }: { onClearSelection: () => void }) {
   }, [
     addNode,
     cancelLink,
+    canUndo,
+    closeSearch,
     deleteSelection,
     hasLinkTargets,
     isBusy,
@@ -440,8 +473,11 @@ function Shortcuts({ onClearSelection }: { onClearSelection: () => void }) {
     onClearSelection,
     open,
     openNode,
+    openSearch,
+    searchOpen,
     selectedNodeId,
     startLink,
+    undo,
   ]);
 
   return null;
@@ -537,6 +573,7 @@ function GraphFlow({
       </ReactFlow>
 
       <EmptyState />
+      <SearchPalette />
       <NodeEditor />
     </div>
   );

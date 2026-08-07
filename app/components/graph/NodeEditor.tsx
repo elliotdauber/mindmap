@@ -213,10 +213,10 @@ export function NodeEditor() {
                     <button
                       type="button"
                       onClick={() => open(neighbour.id, { title, body })}
-                      className="flex min-h-[2.75rem] w-full items-center gap-2 px-2 py-2 text-left transition-colors hover:bg-black/[0.04]"
+                      className="flex min-h-[2.75rem] w-full items-start gap-2 px-2 py-2 text-left transition-colors hover:bg-black/[0.04]"
                     >
                       <span
-                        className="font-hand shrink-0 text-[13px]"
+                        className="font-hand mt-0.5 shrink-0 text-[13px] leading-none"
                         style={{
                           color:
                             neighbour.type === "concept"
@@ -226,7 +226,7 @@ export function NodeEditor() {
                       >
                         {neighbour.type === "concept" ? "○" : "□"}
                       </span>
-                      <span className="font-hand truncate text-[16px] text-[var(--ink-muted)]">
+                      <span className="font-hand min-w-0 flex-1 text-[16px] leading-snug break-words text-[var(--ink-muted)]">
                         {neighbour.title || `untitled ${neighbour.type}`}
                       </span>
                     </button>

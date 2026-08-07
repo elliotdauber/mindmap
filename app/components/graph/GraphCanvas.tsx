@@ -66,9 +66,8 @@ function Wordmark() {
         <p className="mt-0.5 text-[11px] text-[var(--ink-faint)]">
           {nodeCount === 0
             ? "empty canvas"
-            : `${nodeCount} ${nodeCount === 1 ? "node" : "nodes"} · ${edgeCount} ${
-                edgeCount === 1 ? "link" : "links"
-              }`}
+            : `${nodeCount} ${nodeCount === 1 ? "node" : "nodes"} · ${edgeCount} ${edgeCount === 1 ? "link" : "links"
+            }`}
         </p>
       </div>
     </div>
@@ -296,11 +295,10 @@ function EmptyState() {
     <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center">
       <div className="pointer-events-auto max-w-[26rem] px-8 text-center">
         <p className="font-hand fade-in text-[34px] leading-tight text-[var(--ink)]">
-          think in connections
+          capture connections
         </p>
         <p className="rise-in-delayed mt-3 text-[13px] leading-relaxed text-[var(--ink-muted)]">
-          Add content for the things you find, concepts for the ideas behind
-          them. The map arranges itself — you just write and link.
+          connect content with you engage with with connections
         </p>
         <button
           type="button"

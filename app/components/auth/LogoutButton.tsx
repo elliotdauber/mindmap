@@ -20,7 +20,7 @@ export default function LogoutButton() {
       type="button"
       onClick={() => void logout()}
       disabled={pending}
-      className="glass glass-button rounded-xl px-3.5 py-2 text-[11.5px] font-medium disabled:opacity-50"
+      className="sketch sketch-btn px-3.5 py-2 text-[12px] font-medium disabled:opacity-50"
     >
       {pending ? "Signing out…" : "Sign out"}
     </button>

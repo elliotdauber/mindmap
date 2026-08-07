@@ -40,7 +40,7 @@ export default function Login() {
       footer={
         <>
           No account yet?{" "}
-          <Link href="/signup" className="text-[#a9bcff] hover:underline">
+          <Link href="/signup" className="text-[var(--content-stroke)] hover:underline">
             Create one
           </Link>
         </>
@@ -68,13 +68,13 @@ export default function Login() {
         />
 
         {error && (
-          <p className="mt-1 mb-3 text-[12.5px] text-[#ff8f8f]">{error}</p>
+          <p className="mt-1 mb-3 text-[13px] text-[var(--edge-live)]">{error}</p>
         )}
 
         <button
           type="submit"
           disabled={pending}
-          className="mt-2 w-full rounded-xl bg-[#f2f1ee] py-2.5 text-[13.5px] font-medium text-[#0b0d10] transition-all hover:bg-white active:scale-[0.99] disabled:opacity-60"
+          className="sketch-btn-primary font-hand mt-2 w-full py-2.5 text-[18px] disabled:opacity-60"
         >
           {pending ? "Signing in…" : "Sign in"}
         </button>

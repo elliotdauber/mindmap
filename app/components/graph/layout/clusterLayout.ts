@@ -4,28 +4,27 @@ import type { NodeType } from "@/lib/types/graph";
 export const NODE_WIDTH = 272;
 export const NODE_HEIGHT = 132;
 
-/** Smallest gap allowed between two cards, which also gives lines room to pass. */
-const GAP_X = 68;
-const GAP_Y = 56;
+/** Smallest gap between card edges — room for routed lines between wedges. */
+const GAP_X = 54;
+const GAP_Y = 46;
 
-/**
- * Distance between successive rings of concepts. A concept's own content sits in
- * its own slice of the ring rather than between the rings, so this only has to
- * be wide enough to keep neighbouring rings apart.
- */
-const RING_STEP = 450;
+/** Distance between rings of concepts in a cluster. */
+const RING_STEP = 340;
 /** How far a concept's own content sits from it. */
-const SPOKE = 310;
-/** Clusters are packed with this much space between them. */
-const CLUSTER_GAP = 240;
+const SPOKE = 228;
+/** Gap between disconnected clusters once their bounding boxes are packed. */
+const CLUSTER_GAP = 24;
 const SEPARATION_PASSES = 120;
 
+/** Golden angle — places satellite clusters evenly around the hub. */
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+
 /**
- * Rings are elliptical rather than circular: cards are far wider than they are
- * tall, so spreading sideways packs them better and suits a landscape screen.
+ * Near-circular rings: cards are landscape, so a slight horizontal stretch keeps
+ * wedges readable without turning the web into a tall column.
  */
-const STRETCH_X = 1.3;
-const STRETCH_Y = 0.78;
+const STRETCH_X = 1.08;
+const STRETCH_Y = 0.94;
 
 function polar(radius: number, angle: number): Point {
   return {
@@ -43,10 +42,18 @@ function compareIds(a: string, b: string) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-/** Angular width a card occupies at a given distance from the hub. */
-function angularWidth(radius: number) {
-  const halfChord = (NODE_WIDTH + GAP_X) / 2;
-  return 2 * Math.asin(Math.min(1, halfChord / Math.max(radius, halfChord)));
+function clusterRadius(bounds: Bounds) {
+  return Math.hypot(
+    (bounds.maxX - bounds.minX) / 2,
+    (bounds.maxY - bounds.minY) / 2,
+  );
+}
+
+function clusterCentre(bounds: Bounds): Point {
+  return {
+    x: (bounds.minX + bounds.maxX) / 2,
+    y: (bounds.minY + bounds.maxY) / 2,
+  };
 }
 
 type Structure = {
@@ -309,10 +316,11 @@ function layoutCluster(ids: string[], structure: Structure): Map<string, Point> 
         // Keep the card inside its own slice by pushing it far enough out that
         // the slice is wide enough to hold it.
         const needed =
-          (NODE_WIDTH + GAP_X) / 2 / Math.sin(Math.max(slice, 0.001) / 2);
+          ((NODE_WIDTH + GAP_X) / 2 / Math.sin(Math.max(slice, 0.001) / 2)) *
+          1.06;
         const distance = Math.min(
           Math.max(radius + SPOKE, needed),
-          radius + SPOKE * 2.4,
+          radius + SPOKE * 2.35,
         );
 
         positions.set(item.id, polar(distance, cursor + slice / 2));
@@ -346,10 +354,12 @@ function layoutCluster(ids: string[], structure: Structure): Map<string, Point> 
   }
 
   looseContent.forEach((id, index) => {
-    positions.set(id, {
-      x: index * (NODE_WIDTH + GAP_X),
-      y: -RING_STEP,
-    });
+    const count = looseContent.length;
+    const spread = Math.min(0.55, count * 0.18);
+    const angle =
+      -Math.PI / 2 + (index - (count - 1) / 2) * (count > 1 ? spread : 0);
+
+    positions.set(id, polar(SPOKE * 0.9, angle));
   });
 
   for (const id of ids) {
@@ -362,6 +372,142 @@ function layoutCluster(ids: string[], structure: Structure): Map<string, Point> 
 }
 
 type Bounds = { minX: number; minY: number; maxX: number; maxY: number };
+
+type LaidCluster = {
+  ids: string[];
+  positions: Map<string, Point>;
+  bounds: Bounds;
+};
+
+function boundsOverlap(a: Bounds, b: Bounds, gap: number) {
+  return !(
+    a.maxX + gap <= b.minX ||
+    b.maxX + gap <= a.minX ||
+    a.maxY + gap <= b.minY ||
+    b.maxY + gap <= a.minY
+  );
+}
+
+function clusterWorldBounds(
+  cluster: LaidCluster,
+  anchor: Point,
+  localCentre: Point,
+): Bounds {
+  const positions = new Map<string, Point>();
+
+  for (const id of cluster.ids) {
+    const point = cluster.positions.get(id)!;
+    positions.set(id, {
+      x: point.x - localCentre.x + anchor.x,
+      y: point.y - localCentre.y + anchor.y,
+    });
+  }
+
+  return boundsOf(cluster.ids, positions);
+}
+
+/**
+ * The largest connected piece sits in the middle; every other cluster is placed
+ * as close as it can get without overlapping, scanning outward in a fixed
+ * golden-angle order so the result stays deterministic.
+ */
+function packClustersWeb(clusters: LaidCluster[]): Map<string, Point> {
+  const result = new Map<string, Point>();
+  if (clusters.length === 0) return result;
+
+  const ordered = [...clusters].sort(
+    (a, b) =>
+      b.ids.length - a.ids.length ||
+      compareIds(a.ids[0] ?? "", b.ids[0] ?? ""),
+  );
+
+  const hub = ordered[0];
+  const hubCentre = clusterCentre(hub.bounds);
+
+  for (const id of hub.ids) {
+    const point = hub.positions.get(id)!;
+    result.set(id, {
+      x: point.x - hubCentre.x,
+      y: point.y - hubCentre.y,
+    });
+  }
+
+  const placed: Bounds[] = [boundsOf(hub.ids, result)];
+  const satellites = ordered.slice(1);
+
+  for (let index = 0; index < satellites.length; index += 1) {
+    const cluster = satellites[index];
+    const localCentre = clusterCentre(cluster.bounds);
+    const clusterReach = clusterRadius(cluster.bounds);
+
+    let bestAnchor: Point | null = null;
+    let bestDistance = Infinity;
+
+    // Try many rays; pick the closest valid anchor so satellites hug the hub.
+    const rayCount = 48;
+
+    for (let ray = 0; ray < rayCount; ray += 1) {
+      const angle =
+        ray * GOLDEN_ANGLE - Math.PI / 2 + index * GOLDEN_ANGLE * 0.11;
+      const dirX = Math.cos(angle);
+      const dirY = Math.sin(angle);
+
+      let lo = 0;
+      let hi = clusterReach + CLUSTER_GAP;
+
+      for (const bounds of placed) {
+        const span =
+          Math.abs(dirX) * ((bounds.maxX - bounds.minX) / 2 + clusterReach) +
+          Math.abs(dirY) * ((bounds.maxY - bounds.minY) / 2 + clusterReach) +
+          CLUSTER_GAP;
+        hi = Math.max(hi, span * 1.35);
+      }
+
+      let validAnchor: Point | null = null;
+
+      for (let step = 0; step < 28; step += 1) {
+        const distance = (lo + hi) / 2;
+        const anchor = { x: dirX * distance, y: dirY * distance };
+        const candidate = clusterWorldBounds(cluster, anchor, localCentre);
+        const overlaps = placed.some((bounds) =>
+          boundsOverlap(bounds, candidate, CLUSTER_GAP),
+        );
+
+        if (overlaps) {
+          lo = distance;
+        } else {
+          validAnchor = anchor;
+          hi = distance;
+        }
+      }
+
+      if (!validAnchor) continue;
+
+      const distance = Math.hypot(validAnchor.x, validAnchor.y);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestAnchor = validAnchor;
+      }
+    }
+
+    const anchor = bestAnchor ?? {
+      x: (placed[0].maxX - placed[0].minX) / 2 + clusterReach + CLUSTER_GAP,
+      y: 0,
+    };
+
+    for (const id of cluster.ids) {
+      const point = cluster.positions.get(id)!;
+      result.set(id, {
+        x: point.x - localCentre.x + anchor.x,
+        y: point.y - localCentre.y + anchor.y,
+      });
+    }
+
+    placed.push(boundsOf(cluster.ids, result));
+  }
+
+  return result;
+}
 
 function boundsOf(ids: string[], positions: Map<string, Point>): Bounds {
   let minX = Infinity;
@@ -394,65 +540,23 @@ export function clusterLayout(
   const structure = canonicalise(nodes, edges);
   const clusters = findClusters(structure);
 
-  const laid = clusters.map((ids) => {
+  const laid: LaidCluster[] = clusters.map((ids) => {
     const positions = layoutCluster(ids, structure);
     return { ids, positions, bounds: boundsOf(ids, positions) };
   });
 
-  // Biggest cluster first, then packed into rows roughly the shape of a screen.
-  const ordered = [...laid].sort(
-    (a, b) =>
-      b.ids.length - a.ids.length || compareIds(a.ids[0] ?? "", b.ids[0] ?? ""),
-  );
+  const packed = packClustersWeb(laid);
 
-  const totalArea = ordered.reduce(
-    (sum, cluster) =>
-      sum +
-      (cluster.bounds.maxX - cluster.bounds.minX + CLUSTER_GAP) *
-        (cluster.bounds.maxY - cluster.bounds.minY + CLUSTER_GAP),
-    0,
-  );
-  const widestCluster = ordered.reduce(
-    (widest, cluster) =>
-      Math.max(widest, cluster.bounds.maxX - cluster.bounds.minX),
-    0,
-  );
-  const rowLimit = Math.max(widestCluster, Math.sqrt(totalArea * 1.7));
-
-  let cursorX = 0;
-  let cursorY = 0;
-  let rowHeight = 0;
-
-  for (const cluster of ordered) {
-    const width = cluster.bounds.maxX - cluster.bounds.minX;
-    const height = cluster.bounds.maxY - cluster.bounds.minY;
-
-    if (cursorX > 0 && cursorX + width > rowLimit) {
-      cursorX = 0;
-      cursorY += rowHeight + CLUSTER_GAP;
-      rowHeight = 0;
-    }
-
-    for (const id of cluster.ids) {
-      const point = cluster.positions.get(id)!;
-
-      result.set(id, {
-        x: point.x - cluster.bounds.minX + cursorX,
-        y: point.y - cluster.bounds.minY + cursorY,
-      });
-    }
-
-    cursorX += width + CLUSTER_GAP;
-    rowHeight = Math.max(rowHeight, height);
-  }
+  // A final nudge pass in case the tighter spiral left two cards touching.
+  separate(structure.ids, packed);
 
   // Centre the whole map on the origin and convert centres to top-left corners.
-  const overall = boundsOf(structure.ids, result);
+  const overall = boundsOf(structure.ids, packed);
   const shiftX = (overall.minX + overall.maxX) / 2;
   const shiftY = (overall.minY + overall.maxY) / 2;
 
   for (const id of structure.ids) {
-    const point = result.get(id)!;
+    const point = packed.get(id)!;
     result.set(id, {
       x: point.x - shiftX - NODE_WIDTH / 2,
       y: point.y - shiftY - NODE_HEIGHT / 2,

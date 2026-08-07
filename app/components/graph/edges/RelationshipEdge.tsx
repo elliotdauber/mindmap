@@ -1,8 +1,28 @@
 "use client";
 
-import { BaseEdge, EdgeLabelRenderer, type EdgeProps } from "@xyflow/react";
+import {
+  BaseEdge,
+  EdgeLabelRenderer,
+  getBezierPath,
+  type EdgeProps,
+} from "@xyflow/react";
 import { useGraph } from "../graph-context";
 import type { EdgeRoute } from "@/lib/types/graph";
+
+/** If the routed path spans less than this, fall back to React Flow's bezier. */
+const MIN_VISIBLE_SPAN = 6;
+
+function pathSpan(path: string): number {
+  const numbers = path.match(/-?[\d.]+/g)?.map(Number);
+  if (!numbers || numbers.length < 4) return 0;
+
+  const startX = numbers[0];
+  const startY = numbers[1];
+  const endX = numbers[numbers.length - 2];
+  const endY = numbers[numbers.length - 1];
+
+  return Math.hypot(endX - startX, endY - startY);
+}
 
 export default function RelationshipEdge({
   id,
@@ -11,20 +31,44 @@ export default function RelationshipEdge({
   sourceY,
   targetX,
   targetY,
+  sourcePosition,
+  targetPosition,
   selected,
 }: EdgeProps) {
   const { deleteEdge } = useGraph();
   const route = data as EdgeRoute | undefined;
 
-  // The router pre-computes geometry that steers clear of every card; the
-  // straight fallback only applies before the first layout pass lands.
-  const path = route?.path ?? `M ${sourceX},${sourceY} L ${targetX},${targetY}`;
-  const labelX = route?.labelX ?? (sourceX + targetX) / 2;
-  const labelY = route?.labelY ?? (sourceY + targetY) / 2;
+  const [fallbackPath, fallbackLabelX, fallbackLabelY] = getBezierPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+    curvature: 0.28,
+  });
+
+  const routed = route?.path;
+  const useRouted = Boolean(routed && pathSpan(routed) >= MIN_VISIBLE_SPAN);
+
+  const path = useRouted ? routed! : fallbackPath;
+  const labelX = useRouted ? route!.labelX : fallbackLabelX;
+  const labelY = useRouted ? route!.labelY : fallbackLabelY;
 
   return (
     <>
-      <BaseEdge id={id} path={path} interactionWidth={22} className="edge-base" />
+      <BaseEdge
+        id={id}
+        path={path}
+        interactionWidth={24}
+        style={{
+          stroke: selected ? "var(--edge-live)" : "var(--edge)",
+          strokeWidth: selected ? 2.25 : 2,
+          strokeLinecap: "round",
+          strokeLinejoin: "round",
+        }}
+        className="edge-base"
+      />
 
       {selected && (
         <EdgeLabelRenderer>
@@ -37,7 +81,7 @@ export default function RelationshipEdge({
               event.stopPropagation();
               void deleteEdge(id);
             }}
-            className="glass nodrag nopan pointer-events-auto absolute flex h-7 w-7 items-center justify-center rounded-full text-[#c9c7c2] transition-all hover:scale-105 hover:text-[#ff8f8f]"
+            className="sketch nodrag nopan pointer-events-auto absolute flex h-7 w-7 items-center justify-center text-[var(--ink-muted)] transition-colors hover:text-[var(--edge-live)]"
             title="Remove connection"
             aria-label="Remove connection"
           >

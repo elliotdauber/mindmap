@@ -1,0 +1,58 @@
+/** SVG filters that give lines and fills a hand-drawn wobble. */
+export function SketchFilters() {
+  return (
+    <svg
+      className="pointer-events-none absolute h-0 w-0 overflow-hidden"
+      aria-hidden
+    >
+      <defs>
+        <filter
+          id="sketch"
+          x="-4%"
+          y="-4%"
+          width="108%"
+          height="108%"
+          colorInterpolationFilters="sRGB"
+        >
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.045"
+            numOctaves="3"
+            seed="2"
+            result="noise"
+          />
+          <feDisplacementMap
+            in="SourceGraphic"
+            in2="noise"
+            scale="1.6"
+            xChannelSelector="R"
+            yChannelSelector="G"
+          />
+        </filter>
+        <filter
+          id="sketch-edge"
+          x="-2%"
+          y="-2%"
+          width="104%"
+          height="104%"
+          colorInterpolationFilters="sRGB"
+        >
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.05"
+            numOctaves="2"
+            seed="7"
+            result="noise"
+          />
+          <feDisplacementMap
+            in="SourceGraphic"
+            in2="noise"
+            scale="1.2"
+            xChannelSelector="R"
+            yChannelSelector="G"
+          />
+        </filter>
+      </defs>
+    </svg>
+  );
+}

@@ -32,6 +32,8 @@ export type EdgeRoute = {
   path: string;
   labelX: number;
   labelY: number;
+  /** True when the cards are close enough that the line bows sideways to stay visible. */
+  short?: boolean;
 };
 
 export type GraphEdge = {

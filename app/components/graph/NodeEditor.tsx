@@ -127,13 +127,9 @@ export function NodeEditor() {
       <aside className="editor-panel pointer-events-auto relative flex h-full w-full max-w-[26rem] flex-col">
         <header className="flex items-center justify-between gap-3 px-6 pt-6 pb-4">
           <span
-            className="flex items-center gap-2 text-[9.5px] font-semibold tracking-[0.16em] uppercase"
+            className="font-hand text-[18px]"
             style={{ color: variant.accent }}
           >
-            <span
-              className="h-[5px] w-[5px] rounded-full"
-              style={{ background: variant.accent }}
-            />
             {variant.label}
           </span>
 
@@ -141,7 +137,7 @@ export function NodeEditor() {
             type="button"
             onClick={close}
             aria-label="Close"
-            className="glass-button flex h-7 w-7 items-center justify-center rounded-lg"
+            className="sketch-btn flex h-7 w-7 items-center justify-center text-[var(--ink-muted)]"
           >
             <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden>
               <path
@@ -164,10 +160,10 @@ export function NodeEditor() {
             }}
             onBlur={flush}
             placeholder={variant.titlePlaceholder}
-            className="font-display w-full resize-none bg-transparent text-[25px] leading-[1.25] text-[#f4f3f0] outline-none placeholder:text-[#5f5d5a]"
+            className="font-hand w-full resize-none bg-transparent text-[28px] leading-[1.2] text-[var(--ink)] outline-none placeholder:text-[var(--ink-faint)]"
           />
 
-          <div className="my-5 h-px bg-white/8" />
+          <div className="my-5 h-px bg-[var(--stroke-light)]" />
 
           <AutoTextarea
             value={body}
@@ -178,33 +174,35 @@ export function NodeEditor() {
             onBlur={flush}
             placeholder={variant.bodyPlaceholder}
             minHeight={200}
-            className="w-full resize-none bg-transparent text-[13.5px] leading-[1.75] text-[#c8c6c2] outline-none placeholder:text-[#5f5d5a]"
+            className="font-hand w-full resize-none bg-transparent text-[17px] leading-[1.65] text-[var(--ink-muted)] outline-none placeholder:text-[var(--ink-faint)]"
           />
 
           {openNodeNeighbours.length > 0 && (
             <section className="mt-8">
-              <h2 className="text-[9.5px] font-semibold tracking-[0.16em] text-[#6f6d69] uppercase">
-                Connected
+              <h2 className="font-hand text-[15px] text-[var(--ink-faint)]">
+                connected
               </h2>
-              <ul className="mt-2.5 flex flex-col gap-1">
+              <ul className="mt-2 flex flex-col gap-0.5">
                 {openNodeNeighbours.map((neighbour) => (
                   <li key={neighbour.id}>
                     <button
                       type="button"
                       onClick={() => open(neighbour.id)}
-                      className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-white/5"
+                      className="flex w-full items-center gap-2 px-2 py-1.5 text-left transition-colors hover:bg-black/[0.04]"
                     >
                       <span
-                        className="h-[5px] w-[5px] shrink-0 rounded-full"
+                        className="font-hand shrink-0 text-[13px]"
                         style={{
-                          background:
+                          color:
                             neighbour.type === "concept"
-                              ? "var(--concept)"
-                              : "var(--content)",
+                              ? "var(--concept-stroke)"
+                              : "var(--content-stroke)",
                         }}
-                      />
-                      <span className="truncate text-[12.5px] text-[#c8c6c2]">
-                        {neighbour.title || `Untitled ${neighbour.type}`}
+                      >
+                        {neighbour.type === "concept" ? "○" : "□"}
+                      </span>
+                      <span className="font-hand truncate text-[16px] text-[var(--ink-muted)]">
+                        {neighbour.title || `untitled ${neighbour.type}`}
                       </span>
                     </button>
                   </li>
@@ -214,14 +212,14 @@ export function NodeEditor() {
           )}
         </div>
 
-        <footer className="flex items-center justify-between gap-2 border-t border-white/8 px-6 py-4">
+        <footer className="flex items-center justify-between gap-2 border-t-2 border-[var(--stroke-light)] px-6 py-4">
           <button
             type="button"
             disabled={!hasLinkTargets(openNode.id)}
             onClick={() => startLink(openNode.id)}
-            className="glass-button rounded-xl px-3 py-2 text-[12.5px] disabled:opacity-30"
+            className="sketch font-hand px-3 py-1.5 text-[16px] text-[var(--ink)] disabled:opacity-30"
           >
-            Link
+            link
           </button>
 
           {confirming ? (
@@ -229,25 +227,25 @@ export function NodeEditor() {
               <button
                 type="button"
                 onClick={() => void deleteNode(openNode.id)}
-                className="rounded-xl px-3 py-2 text-[12.5px] font-medium text-[#ff8f8f] transition-colors hover:bg-[#ff8f8f]/12"
+                className="font-hand px-3 py-1.5 text-[16px] text-[var(--edge-live)]"
               >
-                Delete
+                delete
               </button>
               <button
                 type="button"
                 onClick={() => setConfirming(false)}
-                className="rounded-xl px-3 py-2 text-[12.5px] text-[#8d8b86] transition-colors hover:text-[#ecebe8]"
+                className="font-hand px-3 py-1.5 text-[16px] text-[var(--ink-muted)]"
               >
-                Keep
+                keep
               </button>
             </div>
           ) : (
             <button
               type="button"
               onClick={() => setConfirming(true)}
-              className="rounded-xl px-3 py-2 text-[12.5px] text-[#8d8b86] transition-colors hover:text-[#ff8f8f]"
+              className="font-hand px-3 py-1.5 text-[16px] text-[var(--ink-faint)] hover:text-[var(--edge-live)]"
             >
-              Delete
+              delete
             </button>
           )}
         </footer>

@@ -46,27 +46,27 @@ function Wordmark() {
 
   return (
     <div className="rise-in flex items-center gap-3">
-      <div className="glass flex h-9 w-9 items-center justify-center rounded-xl">
+      <div className="sketch flex h-9 w-9 items-center justify-center">
         <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden>
           <path
             d="M5.6 8.5l5.4-3.2M5.6 8.5l5.4 3.2"
-            stroke="#8c8a85"
-            strokeWidth="1"
+            stroke="var(--ink-muted)"
+            strokeWidth="1.2"
           />
-          <circle cx="4" cy="8.5" r="2.1" fill="#a9bcff" />
-          <circle cx="12.6" cy="4.6" r="2.1" fill="#f5c14e" />
-          <circle cx="12.6" cy="12.4" r="2.1" fill="#5eead4" />
+          <circle cx="4" cy="8.5" r="2.1" fill="var(--content-stroke)" />
+          <circle cx="12.6" cy="4.6" r="2.1" fill="var(--concept-stroke)" />
+          <circle cx="12.6" cy="12.4" r="2.1" fill="#12b886" />
         </svg>
       </div>
 
       <div>
-        <p className="font-display text-[18px] leading-none text-[#f2f1ee]">
-          Mind Map
+        <p className="font-hand text-[22px] leading-none text-[var(--ink)]">
+          mind map
         </p>
-        <p className="mt-[5px] text-[11px] leading-none tracking-wide text-[#75736f]">
+        <p className="mt-0.5 text-[11px] text-[var(--ink-faint)]">
           {nodeCount === 0
-            ? "Empty canvas"
-            : `${nodeCount} ${nodeCount === 1 ? "idea" : "ideas"} · ${edgeCount} ${
+            ? "empty canvas"
+            : `${nodeCount} ${nodeCount === 1 ? "node" : "nodes"} · ${edgeCount} ${
                 edgeCount === 1 ? "link" : "links"
               }`}
         </p>
@@ -78,7 +78,7 @@ function Wordmark() {
 function Account({ email }: { email: string }) {
   return (
     <div className="rise-in flex items-center gap-2">
-      <span className="glass hidden rounded-xl px-3.5 py-2 text-[11.5px] text-[#a3a19c] sm:block">
+      <span className="sketch hidden px-3 py-1.5 text-[11px] text-[var(--ink-muted)] sm:block">
         {email}
       </span>
       <LogoutButton />
@@ -93,19 +93,19 @@ function LinkBanner() {
 
   return (
     <Panel position="top-center" className="!mt-20">
-      <div className="glass fade-in flex items-center gap-3 rounded-2xl px-4 py-2.5">
-        <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-[var(--concept)]" />
-        <p className="text-[12.5px] text-[#ecebe8]">
+      <div className="sketch fade-in flex items-center gap-3 px-4 py-2">
+        <span className="pulse-dot h-2 w-2 rounded-full bg-[var(--concept-stroke)]" />
+        <p className="font-hand text-[17px] text-[var(--ink)]">
           {linkSourceType === "content"
-            ? "Pick a concept to link to"
-            : "Pick an idea to link to"}
+            ? "pick a concept to link to"
+            : "pick an idea to link to"}
         </p>
         <button
           type="button"
           onClick={cancelLink}
-          className="glass-button rounded-lg px-2 py-1 text-[11px] font-medium"
+          className="sketch-btn px-2 py-0.5 text-[11px] font-medium"
         >
-          Esc
+          esc
         </button>
       </div>
     </Panel>
@@ -127,7 +127,7 @@ function CommandBar() {
   return (
     <Panel position="bottom-center" className="!mb-7">
       <div className="rise-in-delayed flex flex-col items-center gap-3">
-        <div className="glass flex items-center gap-0.5 rounded-2xl p-1.5">
+        <div className="sketch flex items-center gap-0.5 p-1.5">
           <CommandButton
             label="Content"
             shortcut="1"
@@ -162,7 +162,7 @@ function CommandBar() {
             <circle cx="8" cy="8" r="5" stroke="currentColor" strokeWidth="1.3" />
           </CommandButton>
 
-          <div className="mx-1.5 h-9 w-px bg-white/10" />
+          <div className="mx-1.5 h-9 w-px bg-[var(--stroke-light)]" />
 
           <CommandButton
             label="Link"
@@ -182,8 +182,8 @@ function CommandBar() {
           </CommandButton>
         </div>
 
-        <p className="text-[10.5px] tracking-wide text-[#66655f]">
-          Double-click a card to open it · content connects through concepts
+        <p className="font-hand text-[14px] text-[var(--ink-faint)]">
+          double-click to open · content links through concepts
         </p>
       </div>
     </Panel>
@@ -210,18 +210,18 @@ function CommandButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="group flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 transition-colors duration-200 hover:bg-white/6 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent"
+      className="group flex items-center gap-2 px-3 py-2 transition-colors duration-150 hover:bg-black/[0.04] disabled:cursor-not-allowed disabled:opacity-35"
     >
       <span
-        className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/6 transition-transform duration-200 group-hover:scale-105 group-active:scale-95"
+        className="flex h-7 w-7 items-center justify-center transition-transform duration-150 group-hover:scale-105 group-active:scale-95"
         style={{ color: accent }}
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
           {children}
         </svg>
       </span>
-      <span className="text-[13px] font-medium text-[#ecebe8]">{label}</span>
-      <kbd className="rounded-[5px] bg-white/7 px-1.5 py-0.5 font-sans text-[9.5px] font-medium text-[#7c7a76]">
+      <span className="font-hand text-[16px] text-[var(--ink)]">{label}</span>
+      <kbd className="rounded-sm border border-[var(--stroke-light)] px-1 py-0.5 font-sans text-[9px] text-[var(--ink-faint)]">
         {shortcut}
       </kbd>
     </button>
@@ -233,7 +233,7 @@ function ZoomCluster() {
 
   return (
     <Panel position="bottom-right" className="!m-5">
-      <div className="glass rise-in-delayed flex flex-col rounded-xl p-1">
+      <div className="sketch rise-in-delayed flex flex-col p-1">
         <ZoomButton label="Zoom in" onClick={() => void zoomIn({ duration: 220 })}>
           <path
             d="M8 4.5v7M4.5 8h7"
@@ -245,7 +245,7 @@ function ZoomCluster() {
         <ZoomButton label="Zoom out" onClick={() => void zoomOut({ duration: 220 })}>
           <path d="M4.5 8h7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
         </ZoomButton>
-        <div className="mx-1.5 my-1 h-px bg-white/10" />
+        <div className="mx-1.5 my-1 h-px bg-[var(--stroke-light)]" />
         <ZoomButton
           label="Fit to view"
           onClick={() => void fitView({ duration: 520, padding: 0.28, maxZoom: 1 })}
@@ -278,7 +278,7 @@ function ZoomButton({
       onClick={onClick}
       title={label}
       aria-label={label}
-      className="glass-button flex h-8 w-8 items-center justify-center rounded-lg"
+      className="sketch-btn flex h-8 w-8 items-center justify-center text-[var(--ink-muted)]"
     >
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
         {children}
@@ -295,20 +295,20 @@ function EmptyState() {
   return (
     <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center">
       <div className="pointer-events-auto max-w-[26rem] px-8 text-center">
-        <p className="font-display fade-in text-[30px] leading-tight text-[#f2f1ee]">
-          Think in connections
+        <p className="font-hand fade-in text-[34px] leading-tight text-[var(--ink)]">
+          think in connections
         </p>
-        <p className="rise-in-delayed mt-3 text-[13.5px] leading-relaxed text-[#8d8b86]">
+        <p className="rise-in-delayed mt-3 text-[13px] leading-relaxed text-[var(--ink-muted)]">
           Add content for the things you find, concepts for the ideas behind
-          them. Arrangement is handled for you — you just write and link.
+          them. The map arranges itself — you just write and link.
         </p>
         <button
           type="button"
           disabled={isBusy}
           onClick={() => void addNode("content")}
-          className="glass rise-in-delayed mt-7 rounded-xl px-5 py-2.5 text-[13px] font-medium text-[#f2f1ee] transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+          className="sketch-btn-primary font-hand rise-in-delayed mt-7 px-5 py-2 text-[18px] disabled:opacity-50"
         >
-          Add content
+          add content
         </button>
       </div>
     </div>
@@ -481,13 +481,12 @@ function GraphFlow({
 
   // Cards have fixed dimensions and positions come from the layout, so React
   // Flow never needs to report changes back.
-  const noop = useCallback(() => {}, []);
+  const noop = useCallback(() => { }, []);
 
   return (
     <div
-      className={`canvas-shell relative h-full w-full ${
-        isLinking ? "is-linking" : ""
-      } ${isSettling ? "is-settling" : ""}`}
+      className={`canvas-shell relative h-full w-full ${isLinking ? "is-linking" : ""
+        } ${isSettling ? "is-settling" : ""}`}
     >
       <ReactFlow
         nodes={nodes}
@@ -520,9 +519,9 @@ function GraphFlow({
       >
         <Background
           variant={BackgroundVariant.Dots}
-          gap={26}
-          size={1}
-          color="rgba(255,255,255,0.075)"
+          gap={20}
+          size={1.2}
+          color="var(--grid)"
         />
 
         <InitialFit />

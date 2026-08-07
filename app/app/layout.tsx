@@ -1,16 +1,16 @@
-import { Inter, Instrument_Serif } from "next/font/google";
+import { Caveat, DM_Sans } from "next/font/google";
+import { SketchFilters } from "@/components/ui/SketchFilters";
 import "./globals.css";
 
-const inter = Inter({
+const hand = Caveat({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-hand",
   display: "swap",
 });
 
-const serifDisplay = Instrument_Serif({
+const sans = DM_Sans({
   subsets: ["latin"],
-  weight: "400",
-  variable: "--font-serif-display",
+  variable: "--font-dm",
   display: "swap",
 });
 
@@ -25,8 +25,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${serifDisplay.variable}`}>
-      <body className="font-sans">{children}</body>
+    <html lang="en" className={`${hand.variable} ${sans.variable}`}>
+      <body className="font-sans antialiased">
+        <SketchFilters />
+        {children}
+      </body>
     </html>
   );
 }

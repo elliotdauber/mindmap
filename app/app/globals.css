@@ -1,26 +1,33 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-serif-display), ui-serif, Georgia, serif;
+  --font-sans: var(--font-dm), ui-sans-serif, system-ui, sans-serif;
+  --font-hand: var(--font-hand), "Segoe Print", "Comic Sans MS", cursive;
 }
 
 :root {
-  --ink-950: #08090b;
-  --ink-900: #0b0d10;
-  --paper: #ecebe8;
-  --paper-dim: #9d9b96;
-  --paper-faint: #6b6a66;
+  --paper: #fffef8;
+  --paper-line: #e8e4d9;
+  --canvas: #ffffff;
+  --ink: #1a1a1a;
+  --ink-muted: #5c5c5c;
+  --ink-faint: #8a8a8a;
+  --grid: #d8d4cc;
 
-  --line: rgba(255, 255, 255, 0.09);
-  --line-strong: rgba(255, 255, 255, 0.16);
+  --content-fill: #d3ebff;
+  --content-stroke: #1c7ed6;
+  --content: #1c7ed6;
 
-  --content: #a9bcff;
-  --concept: #f5c14e;
+  --concept-fill: #fff3bf;
+  --concept-stroke: #e67700;
+  --concept: #e67700;
 
-  --edge: rgba(236, 235, 232, 0.17);
-  --edge-hot: rgba(236, 235, 232, 0.42);
-  --edge-live: #f5c14e;
+  --edge: #1a1a1a;
+  --edge-hot: #495057;
+  --edge-live: #c92a2a;
+
+  --stroke: #1a1a1a;
+  --stroke-light: #c4bfb4;
 }
 
 html,
@@ -31,25 +38,22 @@ body {
 }
 
 body {
-  background: var(--ink-950);
-  color: var(--paper);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  background: var(--paper);
+  color: var(--ink);
 }
 
 ::selection {
-  background: rgba(169, 188, 255, 0.28);
+  background: rgba(28, 126, 214, 0.22);
 }
 
-/* ─────────────  canvas atmosphere  ───────────── */
+.font-hand {
+  font-family: var(--font-hand), cursive;
+}
+
+/* ─────────────  canvas  ───────────── */
 
 .canvas-shell {
-  background:
-    radial-gradient(135% 105% at 50% 50%, transparent 38%, rgba(0, 0, 0, 0.62) 100%),
-    radial-gradient(115% 75% at 50% -12%, rgba(129, 140, 248, 0.13), transparent 62%),
-    radial-gradient(85% 65% at 102% 108%, rgba(245, 193, 78, 0.09), transparent 58%),
-    radial-gradient(75% 60% at -5% 100%, rgba(45, 212, 191, 0.06), transparent 60%),
-    var(--ink-900);
+  background: var(--canvas);
 }
 
 .canvas-shell.is-linking .react-flow__pane {
@@ -58,126 +62,112 @@ body {
 
 .auth-shell {
   background:
-    radial-gradient(125% 100% at 50% 50%, transparent 40%, rgba(0, 0, 0, 0.55) 100%),
-    radial-gradient(105% 70% at 50% -8%, rgba(129, 140, 248, 0.14), transparent 60%),
-    radial-gradient(80% 60% at 100% 105%, rgba(245, 193, 78, 0.08), transparent 58%),
-    var(--ink-900);
+    linear-gradient(var(--paper-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--paper-line) 1px, transparent 1px),
+    var(--paper);
+  background-size: 28px 28px;
+}
+
+/* ─────────────  sketch surfaces (replaces glass)  ───────────── */
+
+.sketch,
+.glass {
+  background: var(--paper);
+  border: 2px solid var(--stroke);
+  border-radius: 4px 255px 4px 255px / 255px 4px 255px 4px;
+  box-shadow: 2px 3px 0 rgba(26, 26, 26, 0.08);
+}
+
+.sketch-btn,
+.glass-button {
+  color: var(--ink-muted);
+  border-radius: 3px 255px 3px 255px / 255px 3px 255px 3px;
+  transition:
+    color 0.12s ease,
+    background-color 0.12s ease;
+}
+
+.sketch-btn:hover:not(:disabled),
+.glass-button:hover:not(:disabled) {
+  color: var(--ink);
+  background-color: rgba(26, 26, 26, 0.05);
+}
+
+.sketch-btn-primary {
+  background: var(--ink);
+  color: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 3px 255px 3px 255px / 255px 3px 255px 3px;
+  box-shadow: 2px 2px 0 rgba(26, 26, 26, 0.2);
+  transition: transform 0.1s ease;
+}
+
+.sketch-btn-primary:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 rgba(26, 26, 26, 0.18);
 }
 
 .auth-input {
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.04);
+  border: 2px solid var(--stroke);
+  border-radius: 3px 255px 3px 255px / 255px 3px 255px 3px;
+  background: var(--canvas);
   transition:
-    border-color 0.18s ease,
-    box-shadow 0.18s ease,
-    background-color 0.18s ease;
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
 }
 
 .auth-input:focus {
-  border-color: rgba(169, 188, 255, 0.45);
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 0 0 3px rgba(169, 188, 255, 0.14);
-}
-
-/* ─────────────  frosted surfaces  ───────────── */
-
-.glass {
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.075),
-    rgba(255, 255, 255, 0.032)
-  );
-  border: 1px solid var(--line);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.07),
-    0 14px 40px -14px rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(18px) saturate(1.35);
-  -webkit-backdrop-filter: blur(18px) saturate(1.35);
-}
-
-.glass-button {
-  color: var(--paper-dim);
-  transition:
-    color 0.18s ease,
-    background-color 0.18s ease;
-}
-
-.glass-button:hover:not(:disabled) {
-  color: var(--paper);
-  background-color: rgba(255, 255, 255, 0.07);
+  border-color: var(--content-stroke);
+  outline: none;
+  box-shadow: 3px 3px 0 rgba(28, 126, 214, 0.15);
 }
 
 /* ─────────────  node cards  ───────────── */
 
 .node-shell {
   --accent: var(--content);
+  --fill: var(--content-fill);
+  --stroke-color: var(--content-stroke);
   position: relative;
+}
+
+.node-shell[data-variant="concept"] {
+  --accent: var(--concept);
+  --fill: var(--concept-fill);
+  --stroke-color: var(--concept-stroke);
 }
 
 .node-card {
   position: relative;
   overflow: hidden;
-  border-radius: 18px;
-  border: 1px solid var(--line);
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.072),
-    rgba(255, 255, 255, 0.028)
-  );
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.07),
-    0 2px 4px rgba(0, 0, 0, 0.35),
-    0 22px 48px -18px rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(14px) saturate(1.25);
-  -webkit-backdrop-filter: blur(14px) saturate(1.25);
+  background: var(--fill);
+  border: 2px solid var(--stroke-color);
+  border-radius: 3px 255px 4px 255px / 255px 4px 255px 3px;
+  box-shadow: 2px 3px 0 rgba(26, 26, 26, 0.1);
   transition:
-    border-color 0.28s ease,
-    box-shadow 0.32s ease,
-    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.node-card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, var(--accent) 55%, transparent),
-    transparent
-  );
-  opacity: 0.75;
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
 }
 
 .node-shell:hover .node-card {
-  border-color: var(--line-strong);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.09),
-    0 2px 4px rgba(0, 0, 0, 0.35),
-    0 26px 56px -18px rgba(0, 0, 0, 0.8);
+  box-shadow: 3px 4px 0 rgba(26, 26, 26, 0.12);
 }
 
 .node-shell.is-selected .node-card {
-  border-color: color-mix(in srgb, var(--accent) 42%, transparent);
+  border-width: 2.5px;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 0 0 1px color-mix(in srgb, var(--accent) 26%, transparent),
-    0 0 36px -8px color-mix(in srgb, var(--accent) 42%, transparent),
-    0 26px 56px -18px rgba(0, 0, 0, 0.8);
+    0 0 0 2px var(--paper),
+    0 0 0 4px var(--stroke-color),
+    3px 4px 0 rgba(26, 26, 26, 0.14);
 }
 
-/* link mode */
-
 .node-shell.is-source .node-card {
-  border-color: color-mix(in srgb, var(--concept) 60%, transparent);
+  border-color: var(--concept-stroke);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 0 0 1px color-mix(in srgb, var(--concept) 45%, transparent),
-    0 0 44px -10px color-mix(in srgb, var(--concept) 55%, transparent),
-    0 26px 56px -18px rgba(0, 0, 0, 0.8);
+    0 0 0 2px var(--paper),
+    0 0 0 4px var(--concept-stroke),
+    3px 4px 0 rgba(230, 119, 0, 0.2);
 }
 
 .canvas-shell.is-linking .node-shell.is-target {
@@ -185,7 +175,7 @@ body {
 }
 
 .canvas-shell.is-linking .node-shell.is-target .node-card {
-  border-color: color-mix(in srgb, var(--concept) 26%, transparent);
+  border-style: dashed;
 }
 
 .canvas-shell.is-linking .node-shell.is-blocked {
@@ -193,59 +183,54 @@ body {
 }
 
 .canvas-shell.is-linking .node-shell.is-blocked .node-card {
-  opacity: 0.38;
+  opacity: 0.35;
 }
 
 .canvas-shell.is-linking .node-shell.is-target:hover .node-card {
-  transform: translateY(-3px);
-  border-color: color-mix(in srgb, var(--concept) 70%, transparent);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--concept) 50%, transparent),
-    0 0 44px -8px color-mix(in srgb, var(--concept) 50%, transparent),
-    0 30px 60px -18px rgba(0, 0, 0, 0.82);
+  transform: translateY(-2px) rotate(-0.4deg);
+  border-style: solid;
 }
 
 .node-enter {
-  animation: node-enter 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: node-enter 0.35s ease both;
 }
 
 @keyframes node-enter {
   from {
     opacity: 0;
-    transform: scale(0.96) translateY(10px);
+    transform: scale(0.97) rotate(-0.8deg);
   }
   to {
     opacity: 1;
-    transform: scale(1) translateY(0);
+    transform: scale(1) rotate(0);
   }
 }
 
 /* ─────────────  expanded editor  ───────────── */
 
 .editor-scrim {
-  background: rgba(6, 7, 9, 0.5);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
-  animation: fade-in 0.24s ease both;
+  background: rgba(26, 26, 26, 0.12);
+  animation: fade-in 0.2s ease both;
 }
 
 .editor-panel {
-  border-left: 1px solid var(--line);
-  background: linear-gradient(
-    180deg,
-    rgba(30, 31, 36, 0.94),
-    rgba(20, 21, 25, 0.96)
-  );
-  box-shadow: -32px 0 64px -24px rgba(0, 0, 0, 0.72);
-  backdrop-filter: blur(26px) saturate(1.3);
-  -webkit-backdrop-filter: blur(26px) saturate(1.3);
-  animation: editor-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+  border-left: 2px solid var(--stroke);
+  background:
+    repeating-linear-gradient(
+      transparent,
+      transparent 27px,
+      var(--paper-line) 27px,
+      var(--paper-line) 28px
+    ),
+    var(--paper);
+  box-shadow: -4px 0 0 rgba(26, 26, 26, 0.06);
+  animation: editor-in 0.28s ease both;
 }
 
 @keyframes editor-in {
   from {
-    opacity: 0.4;
-    transform: translateX(26px);
+    opacity: 0.5;
+    transform: translateX(18px);
   }
   to {
     opacity: 1;
@@ -255,16 +240,16 @@ body {
 
 .editor-panel textarea::-webkit-scrollbar,
 .editor-panel div::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 
 .editor-panel textarea::-webkit-scrollbar-thumb,
 .editor-panel div::-webkit-scrollbar-thumb {
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  background: var(--stroke-light);
 }
 
-/* ─────────────  react flow overrides  ───────────── */
+/* ─────────────  react flow  ───────────── */
 
 .react-flow__node {
   transition: transform 0.46s cubic-bezier(0.22, 1, 0.36, 1);
@@ -287,52 +272,47 @@ body {
 
 .react-flow__edge-path.edge-base {
   stroke: var(--edge);
-  stroke-width: 1.5;
+  stroke-width: 2;
   stroke-linecap: round;
+  stroke-linejoin: round;
   transition:
-    stroke 0.24s ease,
-    stroke-width 0.24s ease;
+    stroke 0.15s ease,
+    stroke-width 0.15s ease;
 }
 
 .react-flow__edge:hover .edge-base {
   stroke: var(--edge-hot);
-  stroke-width: 1.75;
+  stroke-width: 2.25;
 }
 
 .react-flow__edge.selected .edge-base {
   stroke: var(--edge-live);
-  stroke-width: 2;
-  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--edge-live) 55%, transparent));
+  stroke-width: 2.5;
 }
 
-/*
- * Connections are redrawn at their final geometry the instant the layout
- * changes, while the cards take a moment to glide there. Fading the lines for
- * the length of that glide keeps them from looking detached.
- */
 .canvas-shell .react-flow__edges {
   transition: opacity 0.34s ease;
 }
 
 .canvas-shell.is-settling .react-flow__edges {
-  opacity: 0.28;
+  opacity: 0.88;
   transition: opacity 0.14s ease;
 }
 
-/* ─────────────  entrance choreography  ───────────── */
+/* ─────────────  motion  ───────────── */
 
 .rise-in {
-  animation: rise-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: rise-in 0.4s ease both;
 }
 
 .rise-in-delayed {
-  animation: rise-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
+  animation: rise-in 0.4s ease 0.08s both;
 }
 
 @keyframes rise-in {
   from {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -341,7 +321,7 @@ body {
 }
 
 .fade-in {
-  animation: fade-in 0.4s ease both;
+  animation: fade-in 0.3s ease both;
 }
 
 @keyframes fade-in {
@@ -354,7 +334,7 @@ body {
 }
 
 .pulse-dot {
-  animation: pulse-dot 1.6s ease-in-out infinite;
+  animation: pulse-dot 1.4s ease-in-out infinite;
 }
 
 @keyframes pulse-dot {
@@ -364,8 +344,8 @@ body {
     transform: scale(1);
   }
   50% {
-    opacity: 0.45;
-    transform: scale(0.82);
+    opacity: 0.5;
+    transform: scale(0.85);
   }
 }
 
@@ -381,7 +361,9 @@ body {
     transition: none;
   }
 
-  .node-enter,
+  .react-flow__edge-path.edge-base {
+    filter: none;
+  }
   .editor-panel,
   .editor-scrim,
   .rise-in,

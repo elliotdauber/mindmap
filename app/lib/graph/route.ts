@@ -31,6 +31,8 @@ const BOWS = [0, 38, -38, 80, -80, 132, -132, 192, -192, 260, -260];
 const CELL = 14;
 const GRID_MARGIN = 320;
 const CORNER_RADIUS = 14;
+/** Below this gap between border attachment points, the line needs a sideways bow. */
+const MIN_ENDPOINT_SPAN = 18;
 
 function centre(rect: Rect): Point {
   return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
@@ -479,6 +481,71 @@ function midpointOf(points: Point[]): Point {
   return points[Math.floor(points.length / 2)];
 }
 
+function endpointDistance(source: Rect, target: Rect) {
+  const a = borderPoint(source, centre(target));
+  const b = borderPoint(target, centre(source));
+  return Math.hypot(b.x - a.x, b.y - a.y);
+}
+
+/**
+ * When two cards nearly touch, a straight connector collapses to a dot. Route
+ * through a sideways waypoint so the link is always drawable.
+ */
+function visibleArcRoute(source: Rect, target: Rect): EdgeRoute {
+  const from = centre(source);
+  const to = centre(target);
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = Math.hypot(dx, dy) || 1;
+  const perpX = -dy / length;
+  const perpY = dx / length;
+
+  const lateral = Math.max(56, Math.min(110, length * 0.35 + 44));
+
+  const waypoint = {
+    x: (from.x + to.x) / 2 + perpX * lateral,
+    y: (from.y + to.y) / 2 + perpY * lateral,
+  };
+
+  const a = borderPoint(source, waypoint);
+  const b = borderPoint(target, waypoint);
+  const span = Math.hypot(b.x - a.x, b.y - a.y);
+
+  if (span < MIN_ENDPOINT_SPAN) {
+    const points = [a, waypoint, b];
+    return {
+      path: roundedPath(points),
+      labelX: waypoint.x,
+      labelY: waypoint.y,
+      short: true,
+    };
+  }
+
+  const control = {
+    x: waypoint.x * 2 - (a.x + b.x) / 2,
+    y: waypoint.y * 2 - (a.y + b.y) / 2,
+  };
+  const midpoint = quadraticPoint(a, control, b, 0.5);
+
+  return {
+    path: `M ${a.x},${a.y} Q ${control.x},${control.y} ${b.x},${b.y}`,
+    labelX: midpoint.x,
+    labelY: midpoint.y,
+    short: true,
+  };
+}
+
+function finishRoute(
+  source: Rect,
+  target: Rect,
+  route: EdgeRoute,
+): EdgeRoute {
+  if (endpointDistance(source, target) < MIN_ENDPOINT_SPAN) {
+    return visibleArcRoute(source, target);
+  }
+  return route;
+}
+
 function directRoute(
   source: Rect,
   target: Rect,
@@ -502,6 +569,8 @@ function directRoute(
 
     const a = borderPoint(source, waypoint);
     const b = borderPoint(target, waypoint);
+
+    if (Math.hypot(b.x - a.x, b.y - a.y) < MIN_ENDPOINT_SPAN) continue;
 
     // Control point chosen so the curve actually passes through `waypoint`.
     const control = {
@@ -612,7 +681,7 @@ export function routeEdges(
       navigatedRoute(grid, source, target, sourceIndex, targetIndex, obstacles) ??
       straightRoute(source, target);
 
-    routes.set(edge.id, route);
+    routes.set(edge.id, finishRoute(source, target, route));
   }
 
   return routes;

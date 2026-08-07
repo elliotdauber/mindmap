@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useGraph } from "./graph-context";
 
 const LABELS = {
@@ -47,6 +47,15 @@ export function NodeEditor() {
 
   const nodeId = openNode?.id ?? null;
 
+  const dismiss = useCallback(() => {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    pending.current = null;
+    close({ title, body });
+  }, [body, close, title]);
+
   // Load the card into the form whenever a different one is opened.
   useEffect(() => {
     if (!openNode) return;
@@ -80,15 +89,12 @@ export function NodeEditor() {
     void updateNode(nodeId, changes);
   };
 
-  // Save whatever is outstanding when the editor closes or the card changes.
+  // Save whatever is outstanding when the card changes without closing.
   useEffect(() => {
     return () => {
-      const changes = pending.current;
       if (saveTimer.current) clearTimeout(saveTimer.current);
-      if (changes && nodeId) void updateNode(nodeId, changes);
       pending.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodeId]);
 
   const queueSave = (next: { title: string; body: string }) => {
@@ -103,13 +109,13 @@ export function NodeEditor() {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
-        close();
+        dismiss();
       }
     }
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [close, nodeId]);
+  }, [dismiss, nodeId]);
 
   if (!openNode) return null;
 
@@ -120,7 +126,7 @@ export function NodeEditor() {
       <button
         type="button"
         aria-label="Close editor"
-        onClick={close}
+        onClick={dismiss}
         className="editor-scrim pointer-events-auto absolute inset-0 cursor-default"
       />
 
@@ -135,7 +141,7 @@ export function NodeEditor() {
 
           <button
             type="button"
-            onClick={close}
+            onClick={dismiss}
             aria-label="Close"
             className="sketch-btn flex h-7 w-7 items-center justify-center text-[var(--ink-muted)]"
           >
@@ -187,7 +193,7 @@ export function NodeEditor() {
                   <li key={neighbour.id}>
                     <button
                       type="button"
-                      onClick={() => open(neighbour.id)}
+                      onClick={() => open(neighbour.id, { title, body })}
                       className="flex w-full items-center gap-2 px-2 py-1.5 text-left transition-colors hover:bg-black/[0.04]"
                     >
                       <span
@@ -216,7 +222,7 @@ export function NodeEditor() {
           <button
             type="button"
             disabled={!hasLinkTargets(openNode.id)}
-            onClick={() => startLink(openNode.id)}
+            onClick={() => startLink(openNode.id, { title, body })}
             className="sketch font-hand px-3 py-1.5 text-[16px] text-[var(--ink)] disabled:opacity-30"
           >
             link

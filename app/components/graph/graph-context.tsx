@@ -51,10 +51,10 @@ type GraphContextValue = {
   deleteNode: (id: string) => Promise<void>;
   deleteEdge: (id: string) => Promise<void>;
   deleteSelection: () => void;
-  startLink: (id: string) => void;
+  startLink: (id: string, leaving?: { title: string; body: string }) => void;
   cancelLink: () => void;
-  open: (id: string) => void;
-  close: () => void;
+  open: (id: string, leaving?: { title: string; body: string }) => void;
+  close: (snapshot?: { title: string; body: string }) => void;
   consumeViewportFocus: () => void;
 };
 
@@ -160,12 +160,15 @@ export function GraphProvider({
   const selectedNodeRef = useRef(selectedNodeId);
   const selectedEdgeRef = useRef(selectedEdgeId);
   const linkSourceRef = useRef(linkSourceId);
+  const openNodeIdRef = useRef(openNodeId);
+  const draftNodeIdsRef = useRef(new Set<string>());
 
   nodesRef.current = nodes;
   edgesRef.current = edges;
   selectedNodeRef.current = selectedNodeId;
   selectedEdgeRef.current = selectedEdgeId;
   linkSourceRef.current = linkSourceId;
+  openNodeIdRef.current = openNodeId;
 
   const key = structureKey(nodes, edges);
 
@@ -220,26 +223,8 @@ export function GraphProvider({
     };
   }, [positions]);
 
-  const startLink = useCallback((id: string) => {
-    setLinkSourceId(id);
-    setSelectedNodeId(id);
-    setSelectedEdgeId(null);
-    setOpenNodeId(null);
-  }, []);
-
   const cancelLink = useCallback(() => {
     setLinkSourceId(null);
-  }, []);
-
-  const open = useCallback((id: string) => {
-    setOpenNodeId(id);
-    setSelectedNodeId(id);
-    setSelectedEdgeId(null);
-    setLinkSourceId(null);
-  }, []);
-
-  const close = useCallback(() => {
-    setOpenNodeId(null);
   }, []);
 
   const consumeViewportFocus = useCallback(() => {
@@ -296,6 +281,8 @@ export function GraphProvider({
         },
       ]);
 
+      draftNodeIdsRef.current.add(created.id);
+
       setSelectedNodeId(created.id);
       setSelectedEdgeId(null);
       setLinkSourceId(null);
@@ -314,6 +301,10 @@ export function GraphProvider({
 
       const next = { ...node, ...updates };
       setNodes(previous.map((card) => (card.id === id ? next : card)));
+
+      if (next.title.trim() || next.body.trim()) {
+        draftNodeIdsRef.current.delete(id);
+      }
 
       const { error } = await supabase
         .from("nodes")
@@ -343,6 +334,7 @@ export function GraphProvider({
       if (selectedNodeRef.current === id) setSelectedNodeId(null);
       if (linkSourceRef.current === id) setLinkSourceId(null);
       setOpenNodeId((current) => (current === id ? null : current));
+      draftNodeIdsRef.current.delete(id);
 
       const { error } = await supabase.from("nodes").delete().eq("id", id);
 
@@ -370,6 +362,72 @@ export function GraphProvider({
       }
     },
     [supabase],
+  );
+
+  const finalizeEditor = useCallback(
+    (snapshot?: { title: string; body: string }) => {
+      const openId = openNodeIdRef.current;
+      if (!openId) return;
+
+      const node = nodesRef.current.find((candidate) => candidate.id === openId);
+      const title = (snapshot?.title ?? node?.title ?? "").trim();
+      const body = (snapshot?.body ?? node?.body ?? "").trim();
+
+      if (draftNodeIdsRef.current.has(openId) && !title && !body) {
+        draftNodeIdsRef.current.delete(openId);
+        void deleteNode(openId);
+        return;
+      }
+
+      if (
+        snapshot &&
+        node &&
+        (snapshot.title !== node.title || snapshot.body !== node.body)
+      ) {
+        void updateNode(openId, {
+          title: snapshot.title,
+          body: snapshot.body,
+        });
+      }
+    },
+    [deleteNode, updateNode],
+  );
+
+  const open = useCallback(
+    (id: string, leaving?: { title: string; body: string }) => {
+      const current = openNodeIdRef.current;
+      if (current && current !== id) {
+        finalizeEditor(leaving);
+      }
+
+      setOpenNodeId(id);
+      setSelectedNodeId(id);
+      setSelectedEdgeId(null);
+      setLinkSourceId(null);
+    },
+    [finalizeEditor],
+  );
+
+  const close = useCallback(
+    (snapshot?: { title: string; body: string }) => {
+      finalizeEditor(snapshot);
+      setOpenNodeId(null);
+    },
+    [finalizeEditor],
+  );
+
+  const startLink = useCallback(
+    (id: string, leaving?: { title: string; body: string }) => {
+      if (openNodeIdRef.current) {
+        finalizeEditor(leaving);
+      }
+
+      setLinkSourceId(id);
+      setSelectedNodeId(id);
+      setSelectedEdgeId(null);
+      setOpenNodeId(null);
+    },
+    [finalizeEditor],
   );
 
   const linkTo = useCallback(

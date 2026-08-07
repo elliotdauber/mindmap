@@ -21,11 +21,6 @@ export default function Home() {
           think in connections
         </h1>
 
-        <p className="rise-in-delayed mx-auto mt-4 max-w-[26rem] text-[14px] leading-relaxed text-[var(--ink-muted)]">
-          Capture content and the concepts behind it. The map arranges itself, so
-          all you do is write and link.
-        </p>
-
         <div className="rise-in-delayed mt-9 flex items-center justify-center gap-3">
           <Link
             href="/signup"

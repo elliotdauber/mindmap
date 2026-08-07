@@ -13,7 +13,7 @@ import {
 import type { Edge, Node } from "@xyflow/react";
 import { createClient } from "@/lib/supabase/client";
 import type { DbEdge, DbNode, GraphEdge, NodeType } from "@/lib/types/graph";
-import { dbEdgeToEdge, dbNodeToDisplayed } from "@/lib/graph/transform";
+import { dbEdgeToEdge, dbNodeToDisplayed, normalizeEdges } from "@/lib/graph/transform";
 import { routeEdges, type Rect } from "@/lib/graph/route";
 import {
   NODE_HEIGHT,
@@ -100,29 +100,6 @@ function isLinkAllowed(
   return !(source.type === "content" && target.type === "content");
 }
 
-/**
- * Everything the placement depends on: which cards exist, what they are, and
- * how they connect. Titles, bodies and selection are deliberately absent, so
- * editing or clicking can never move the map.
- */
-function structureKey(nodes: GraphNode[], edges: GraphEdge[]) {
-  const cards = nodes
-    .map((node) => `${node.id}:${node.type}`)
-    .sort()
-    .join(",");
-
-  const links = edges
-    .map((edge) =>
-      edge.source < edge.target
-        ? `${edge.source}>${edge.target}`
-        : `${edge.target}>${edge.source}`,
-    )
-    .sort()
-    .join(",");
-
-  return `${cards}|${links}`;
-}
-
 /** How long the cards take to glide once the layout has changed. */
 const SETTLE_MS = 520;
 
@@ -145,7 +122,10 @@ export function GraphProvider({
     }),
   );
   const [edges, setEdges] = useState<GraphEdge[]>(() =>
-    initialEdges.map(dbEdgeToEdge),
+    normalizeEdges(
+      initialNodes.map((row) => row.id),
+      initialEdges.map(dbEdgeToEdge),
+    ),
   );
 
   const [isBusy, setIsBusy] = useState(false);
@@ -170,21 +150,33 @@ export function GraphProvider({
   linkSourceRef.current = linkSourceId;
   openNodeIdRef.current = openNodeId;
 
-  const key = structureKey(nodes, edges);
+  const nodeIds = useMemo(() => new Set(nodes.map((node) => node.id)), [nodes]);
 
-  // Placement is a pure function of the structure key, so it is recomputed only
-  // when a card or connection is actually added or removed.
+  const links = useMemo(
+    () => normalizeEdges(nodeIds, edges),
+    [edges, nodeIds],
+  );
+
+  // Drop orphan or duplicate rows left in state after a fast discard.
+  useEffect(() => {
+    const normalized = normalizeEdges(nodeIds, edges);
+    if (normalized.length !== edges.length) {
+      setEdges(normalized);
+    }
+  }, [edges, nodeIds]);
+
+  // Placement is a pure function of structure, so it is recomputed only when a
+  // card or connection is actually added or removed.
   const positions = useMemo(
     () =>
       clusterLayout(
-        nodesRef.current.map((node) => ({ id: node.id, type: node.type })),
-        edgesRef.current.map((edge) => ({
+        nodes.map((node) => ({ id: node.id, type: node.type })),
+        links.map((edge) => ({
           source: edge.source,
           target: edge.target,
         })),
       ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [key],
+    [links, nodes],
   );
 
   const routes = useMemo(() => {
@@ -199,8 +191,8 @@ export function GraphProvider({
       };
     });
 
-    return routeEdges(rects, edgesRef.current);
-  }, [positions]);
+    return routeEdges(rects, links);
+  }, [links, positions]);
 
   // Connections are redrawn at their final geometry immediately while the cards
   // glide, so they get softened for the length of that glide.
@@ -267,7 +259,15 @@ export function GraphProvider({
         if (edgeError) {
           console.error(edgeError);
         } else if (edgeRow) {
-          setEdges((current) => [...current, dbEdgeToEdge(edgeRow as DbEdge)]);
+          const edge = dbEdgeToEdge(edgeRow as DbEdge);
+          const ids = new Set(nodesRef.current.map((node) => node.id));
+
+          if (ids.has(edge.source) && ids.has(edge.target)) {
+            setEdges((current) => normalizeEdges(ids, [...current, edge]));
+          } else {
+            // The card was discarded before the auto-link finished.
+            void supabase.from("edges").delete().eq("id", edgeRow.id);
+          }
         }
       }
 
@@ -326,8 +326,11 @@ export function GraphProvider({
 
       setNodes(previousNodes.filter((node) => node.id !== id));
       setEdges(
-        previousEdges.filter(
-          (edge) => edge.source !== id && edge.target !== id,
+        normalizeEdges(
+          new Set(previousNodes.filter((node) => node.id !== id).map((node) => node.id)),
+          previousEdges.filter(
+            (edge) => edge.source !== id && edge.target !== id,
+          ),
         ),
       );
 
@@ -464,7 +467,12 @@ export function GraphProvider({
         return;
       }
 
-      setEdges((current) => [...current, dbEdgeToEdge(data as DbEdge)]);
+      setEdges((current) =>
+        normalizeEdges(
+          new Set(nodesRef.current.map((node) => node.id)),
+          [...current, dbEdgeToEdge(data as DbEdge)],
+        ),
+      );
     },
     [supabase],
   );
@@ -537,12 +545,12 @@ export function GraphProvider({
 
   const flowEdges = useMemo<Edge[]>(
     () =>
-      edges.map((edge) => ({
+      links.map((edge) => ({
         ...edge,
         data: routes.get(edge.id),
         selected: edge.id === selectedEdgeId,
       })),
-    [edges, routes, selectedEdgeId],
+    [links, routes, selectedEdgeId],
   );
 
   const linkSourceType = useMemo(() => {
@@ -570,7 +578,7 @@ export function GraphProvider({
     if (!openNodeId) return [];
 
     const ids = new Set(
-      edges
+      links
         .filter(
           (edge) => edge.source === openNodeId || edge.target === openNodeId,
         )
@@ -578,12 +586,12 @@ export function GraphProvider({
     );
 
     return nodes.filter((node) => ids.has(node.id));
-  }, [edges, nodes, openNodeId]);
+  }, [links, nodes, openNodeId]);
 
   const value = useMemo<GraphContextValue>(
     () => ({
       nodeCount: nodes.length,
-      edgeCount: edges.length,
+      edgeCount: links.length,
       isBusy,
       isSettling,
       selectedNodeId,
@@ -614,7 +622,7 @@ export function GraphProvider({
       deleteEdge,
       deleteNode,
       deleteSelection,
-      edges.length,
+      links.length,
       hasLinkTargets,
       isBusy,
       isLinkableTarget,

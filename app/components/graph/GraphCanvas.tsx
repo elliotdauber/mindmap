@@ -111,6 +111,52 @@ function LinkBanner() {
   );
 }
 
+function ideaLabel(node: { title: string; type: string }) {
+  const title = node.title.trim();
+  return title || `untitled ${node.type}`;
+}
+
+function EdgeActionBar() {
+  const { isTouch, selectedEdge, deleteEdge, clearSelection } = useGraph();
+
+  if (!isTouch || !selectedEdge) return null;
+
+  const sourceLabel = ideaLabel(selectedEdge.source);
+  const targetLabel = ideaLabel(selectedEdge.target);
+
+  return (
+    <Panel
+      position="bottom-center"
+      className="panel-safe-bottom !z-10 !mb-[max(5.5rem,calc(5.5rem+env(safe-area-inset-bottom)))]"
+    >
+      <div className="edge-action-bar sketch fade-in w-[min(22rem,calc(100vw-1.5rem))] px-4 py-3">
+        <p className="font-hand text-center text-[17px] text-[var(--ink)]">
+          selected link
+        </p>
+        <p className="mt-1 truncate text-center text-[13px] text-[var(--ink-muted)]">
+          {sourceLabel} ↔ {targetLabel}
+        </p>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="sketch-btn min-h-[2.75rem] font-hand text-[16px] text-[var(--ink-muted)]"
+          >
+            cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => void deleteEdge(selectedEdge.id)}
+            className="sketch-btn min-h-[2.75rem] font-hand text-[16px] text-[var(--edge-live)]"
+          >
+            remove link
+          </button>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
 function CommandBar() {
   const {
     addNode,
@@ -228,7 +274,7 @@ function CommandBar() {
 
         {isTouch ? (
           <p className="font-hand text-center text-[12px] text-[var(--ink-faint)]">
-            tap twice to open · pinch to zoom
+            tap link to remove · tap twice to open
           </p>
         ) : (
           <p className="font-hand text-[14px] text-[var(--ink-faint)]">
@@ -654,6 +700,7 @@ function GraphFlow({
         </Panel>
 
         <LinkBanner />
+        <EdgeActionBar />
         <CommandBar />
         <ZoomCluster />
       </ReactFlow>

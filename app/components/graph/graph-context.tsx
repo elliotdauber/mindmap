@@ -38,6 +38,12 @@ type GraphContextValue = {
   /** True while the map is gliding into new positions after a structural change. */
   isSettling: boolean;
   selectedNodeId: string | null;
+  selectedEdgeId: string | null;
+  selectedEdge: {
+    id: string;
+    source: GraphNode;
+    target: GraphNode;
+  } | null;
   linkSourceId: string | null;
   linkSourceType: NodeType | null;
   isLinking: boolean;
@@ -57,6 +63,7 @@ type GraphContextValue = {
   deleteNode: (id: string, options?: { skipUndo?: boolean }) => Promise<void>;
   deleteEdge: (id: string, options?: { skipUndo?: boolean }) => Promise<void>;
   deleteSelection: () => void;
+  clearSelection: () => void;
   startLink: (id: string, leaving?: { title: string; body: string }) => void;
   cancelLink: () => void;
   open: (id: string, leaving?: { title: string; body: string }) => void;
@@ -596,6 +603,8 @@ export function GraphProvider({
     setLinkSourceId(null);
   }, []);
 
+  const clearSelection = onPaneClick;
+
   const undo = useCallback(async () => {
     const entry = undoStackRef.current.pop();
     if (!entry) {
@@ -746,6 +755,19 @@ export function GraphProvider({
     [nodes],
   );
 
+  const selectedEdge = useMemo(() => {
+    if (!selectedEdgeId) return null;
+
+    const edge = links.find((link) => link.id === selectedEdgeId);
+    if (!edge) return null;
+
+    const source = nodes.find((node) => node.id === edge.source);
+    const target = nodes.find((node) => node.id === edge.target);
+    if (!source || !target) return null;
+
+    return { id: edge.id, source, target };
+  }, [links, nodes, selectedEdgeId]);
+
   const openNode = useMemo(
     () => nodes.find((node) => node.id === openNodeId) ?? null,
     [nodes, openNodeId],
@@ -773,6 +795,8 @@ export function GraphProvider({
       isBusy,
       isSettling,
       selectedNodeId,
+      selectedEdgeId,
+      selectedEdge,
       linkSourceId,
       linkSourceType,
       isLinking: linkSourceId !== null,
@@ -789,6 +813,7 @@ export function GraphProvider({
       deleteNode,
       deleteEdge,
       deleteSelection,
+      clearSelection,
       startLink,
       cancelLink,
       open,
@@ -810,6 +835,7 @@ export function GraphProvider({
       deleteEdge,
       deleteNode,
       deleteSelection,
+      clearSelection,
       jumpToNode,
       links.length,
       hasLinkTargets,
@@ -826,6 +852,8 @@ export function GraphProvider({
       openSearch,
       pulseNodeId,
       searchOpen,
+      selectedEdge,
+      selectedEdgeId,
       selectedNodeId,
       startLink,
       undo,

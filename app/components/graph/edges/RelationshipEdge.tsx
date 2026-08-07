@@ -60,17 +60,17 @@ export default function RelationshipEdge({
       <BaseEdge
         id={id}
         path={path}
-        interactionWidth={isTouch ? 40 : 24}
+        interactionWidth={isTouch ? 52 : 24}
         style={{
           stroke: selected ? "var(--edge-live)" : "var(--edge)",
-          strokeWidth: selected ? 2.25 : 2,
+          strokeWidth: selected ? (isTouch ? 3 : 2.25) : 2,
           strokeLinecap: "round",
           strokeLinejoin: "round",
         }}
         className="edge-base"
       />
 
-      {selected && (
+      {selected && !isTouch && (
         <EdgeLabelRenderer>
           <button
             type="button"

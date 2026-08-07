@@ -297,9 +297,6 @@ function EmptyState() {
         <p className="font-hand fade-in text-[34px] leading-tight text-[var(--ink)]">
           capture connections
         </p>
-        <p className="rise-in-delayed mt-3 text-[13px] leading-relaxed text-[var(--ink-muted)]">
-          connect content with you engage with with connections
-        </p>
         <button
           type="button"
           disabled={isBusy}

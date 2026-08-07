@@ -21,6 +21,7 @@ import {
   NODE_WIDTH,
   clusterLayout,
 } from "./layout/clusterLayout";
+import { useCoarsePointer } from "@/hooks/use-coarse-pointer";
 
 export type GraphNode = {
   id: string;
@@ -65,6 +66,8 @@ type GraphContextValue = {
   openSearch: () => void;
   closeSearch: () => void;
   undo: () => Promise<void>;
+  /** Finger-first devices — changes tap and control affordances. */
+  isTouch: boolean;
 };
 
 const GraphContext = createContext<GraphContextValue | null>(null);
@@ -118,6 +121,9 @@ export function GraphProvider({
   children,
 }: GraphProviderProps) {
   const supabase = useMemo(() => createClient(), []);
+  const isTouch = useCoarsePointer();
+  const isTouchRef = useRef(isTouch);
+  isTouchRef.current = isTouch;
 
   const [nodes, setNodes] = useState<GraphNode[]>(() =>
     initialNodes.map((row) => {
@@ -567,10 +573,15 @@ export function GraphProvider({
         return;
       }
 
+      if (isTouchRef.current && selectedNodeRef.current === id) {
+        open(id);
+        return;
+      }
+
       setSelectedNodeId(id);
       setSelectedEdgeId(null);
     },
-    [linkTo],
+    [linkTo, open],
   );
 
   const onEdgeClick = useCallback((id: string) => {
@@ -787,6 +798,7 @@ export function GraphProvider({
       openSearch,
       closeSearch,
       undo,
+      isTouch,
     }),
     [
       addNode,
@@ -804,6 +816,7 @@ export function GraphProvider({
       isBusy,
       isLinkableTarget,
       isSettling,
+      isTouch,
       linkSourceId,
       linkSourceType,
       nodes,

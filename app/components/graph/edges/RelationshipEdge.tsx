@@ -35,7 +35,7 @@ export default function RelationshipEdge({
   targetPosition,
   selected,
 }: EdgeProps) {
-  const { deleteEdge } = useGraph();
+  const { deleteEdge, isTouch } = useGraph();
   const route = data as EdgeRoute | undefined;
 
   const [fallbackPath, fallbackLabelX, fallbackLabelY] = getBezierPath({
@@ -60,7 +60,7 @@ export default function RelationshipEdge({
       <BaseEdge
         id={id}
         path={path}
-        interactionWidth={24}
+        interactionWidth={isTouch ? 40 : 24}
         style={{
           stroke: selected ? "var(--edge-live)" : "var(--edge)",
           strokeWidth: selected ? 2.25 : 2,
@@ -81,7 +81,7 @@ export default function RelationshipEdge({
               event.stopPropagation();
               void deleteEdge(id);
             }}
-            className="sketch nodrag nopan pointer-events-auto absolute flex h-7 w-7 items-center justify-center text-[var(--ink-muted)] transition-colors hover:text-[var(--edge-live)]"
+            className="edge-delete-btn sketch nodrag nopan pointer-events-auto absolute flex h-7 w-7 items-center justify-center text-[var(--ink-muted)] transition-colors hover:text-[var(--edge-live)]"
             title="Remove connection"
             aria-label="Remove connection"
           >

@@ -79,7 +79,7 @@ export function IdeaNode({ id, data, selected, variant }: IdeaNodeProps) {
           </span>
 
           <div
-            className={`flex items-center gap-0.5 transition-opacity duration-150 ${
+            className={`node-actions flex items-center gap-0.5 transition-opacity duration-150 ${
               selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
             }`}
           >
@@ -170,7 +170,7 @@ function IconButton({
         event.stopPropagation();
         onClick();
       }}
-      className="nodrag flex h-6 w-6 items-center justify-center text-[var(--ink-muted)] hover:text-[var(--ink)] disabled:opacity-30"
+      className="nodrag flex h-6 w-6 items-center justify-center text-[var(--ink-muted)] hover:text-[var(--ink)] disabled:opacity-30 max-sm:h-10 max-sm:w-10"
     >
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
         {children}

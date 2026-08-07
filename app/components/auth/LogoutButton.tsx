@@ -20,7 +20,7 @@ export default function LogoutButton() {
       type="button"
       onClick={() => void logout()}
       disabled={pending}
-      className="sketch sketch-btn px-3.5 py-2 text-[12px] font-medium disabled:opacity-50"
+      className="sketch sketch-btn min-h-[2.75rem] px-3.5 py-2 text-[12px] font-medium disabled:opacity-50 sm:min-h-0"
     >
       {pending ? "Signing out…" : "Sign out"}
     </button>

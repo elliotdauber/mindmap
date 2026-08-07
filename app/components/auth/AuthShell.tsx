@@ -12,7 +12,7 @@ export function AuthShell({
   footer: React.ReactNode;
 }) {
   return (
-    <main className="auth-shell flex min-h-screen items-center justify-center px-6">
+    <main className="auth-shell flex min-h-screen items-center justify-center px-5 py-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6">
       <div className="w-full max-w-[22rem]">
         <Link
           href="/"
@@ -33,7 +33,7 @@ export function AuthShell({
           <span className="font-hand text-[17px]">mind map</span>
         </Link>
 
-        <h1 className="font-hand rise-in mt-9 text-[38px] leading-tight text-[var(--ink)]">
+        <h1 className="font-hand rise-in mt-9 text-[32px] leading-tight text-[var(--ink)] sm:text-[38px]">
           {title}
         </h1>
         <p className="rise-in-delayed mt-2 text-[14px] text-[var(--ink-muted)]">

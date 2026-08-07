@@ -1,6 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+
+import { useCoarsePointer } from "@/hooks/use-coarse-pointer";
 import { useGraph } from "./graph-context";
 
 const LABELS = {
@@ -37,6 +40,8 @@ export function NodeEditor() {
     open,
   } = useGraph();
 
+  const isTouch = useCoarsePointer();
+  const [mounted, setMounted] = useState(false);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [confirming, setConfirming] = useState(false);
@@ -46,6 +51,10 @@ export function NodeEditor() {
   const pending = useRef<{ title: string; body: string } | null>(null);
 
   const nodeId = openNode?.id ?? null;
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const dismiss = useCallback(() => {
     if (saveTimer.current) {
@@ -106,6 +115,9 @@ export function NodeEditor() {
   useEffect(() => {
     if (!nodeId) return;
 
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -114,15 +126,18 @@ export function NodeEditor() {
     }
 
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", onKeyDown);
+    };
   }, [dismiss, nodeId]);
 
-  if (!openNode) return null;
+  if (!openNode || !mounted) return null;
 
   const variant = LABELS[openNode.type];
 
-  return (
-    <div className="pointer-events-none absolute inset-0 z-20 flex justify-end">
+  return createPortal(
+    <div className="editor-overlay pointer-events-none fixed inset-0 z-[90] flex justify-end">
       <button
         type="button"
         aria-label="Close editor"
@@ -130,8 +145,12 @@ export function NodeEditor() {
         className="editor-scrim pointer-events-auto absolute inset-0 cursor-default"
       />
 
-      <aside className="editor-panel pointer-events-auto relative flex h-full w-full max-w-[26rem] flex-col">
-        <header className="flex items-center justify-between gap-3 px-6 pt-6 pb-4">
+      <aside
+        className={`editor-panel pointer-events-auto relative flex h-full flex-col ${
+          isTouch ? "w-full" : "w-full max-w-[26rem]"
+        }`}
+      >
+        <header className="flex items-center justify-between gap-3 px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-4 sm:px-6 sm:pt-6">
           <span
             className="font-hand text-[18px]"
             style={{ color: variant.accent }}
@@ -143,7 +162,7 @@ export function NodeEditor() {
             type="button"
             onClick={dismiss}
             aria-label="Close"
-            className="sketch-btn flex h-7 w-7 items-center justify-center text-[var(--ink-muted)]"
+            className="sketch-btn flex h-11 w-11 items-center justify-center text-[var(--ink-muted)] sm:h-7 sm:w-7"
           >
             <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden>
               <path
@@ -156,7 +175,7 @@ export function NodeEditor() {
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 sm:px-6">
           <AutoTextarea
             ref={titleRef}
             value={title}
@@ -166,7 +185,7 @@ export function NodeEditor() {
             }}
             onBlur={flush}
             placeholder={variant.titlePlaceholder}
-            className="font-hand w-full resize-none bg-transparent text-[28px] leading-[1.2] text-[var(--ink)] outline-none placeholder:text-[var(--ink-faint)]"
+            className="editor-title font-hand w-full resize-none bg-transparent text-[26px] leading-[1.2] text-[var(--ink)] outline-none placeholder:text-[var(--ink-faint)] sm:text-[28px]"
           />
 
           <div className="my-5 h-px bg-[var(--stroke-light)]" />
@@ -180,7 +199,7 @@ export function NodeEditor() {
             onBlur={flush}
             placeholder={variant.bodyPlaceholder}
             minHeight={200}
-            className="font-hand w-full resize-none bg-transparent text-[17px] leading-[1.65] text-[var(--ink-muted)] outline-none placeholder:text-[var(--ink-faint)]"
+            className="editor-body font-hand w-full resize-none bg-transparent text-[17px] leading-[1.65] text-[var(--ink-muted)] outline-none placeholder:text-[var(--ink-faint)]"
           />
 
           {openNodeNeighbours.length > 0 && (
@@ -194,7 +213,7 @@ export function NodeEditor() {
                     <button
                       type="button"
                       onClick={() => open(neighbour.id, { title, body })}
-                      className="flex w-full items-center gap-2 px-2 py-1.5 text-left transition-colors hover:bg-black/[0.04]"
+                      className="flex min-h-[2.75rem] w-full items-center gap-2 px-2 py-2 text-left transition-colors hover:bg-black/[0.04]"
                     >
                       <span
                         className="font-hand shrink-0 text-[13px]"
@@ -218,12 +237,12 @@ export function NodeEditor() {
           )}
         </div>
 
-        <footer className="flex items-center justify-between gap-2 border-t-2 border-[var(--stroke-light)] px-6 py-4">
+        <footer className="flex items-center justify-between gap-2 border-t-2 border-[var(--stroke-light)] px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
           <button
             type="button"
             disabled={!hasLinkTargets(openNode.id)}
             onClick={() => startLink(openNode.id, { title, body })}
-            className="sketch font-hand px-3 py-1.5 text-[16px] text-[var(--ink)] disabled:opacity-30"
+            className="sketch font-hand min-h-[2.75rem] px-4 py-2 text-[16px] text-[var(--ink)] disabled:opacity-30"
           >
             link
           </button>
@@ -233,14 +252,14 @@ export function NodeEditor() {
               <button
                 type="button"
                 onClick={() => void deleteNode(openNode.id)}
-                className="font-hand px-3 py-1.5 text-[16px] text-[var(--edge-live)]"
+                className="font-hand min-h-[2.75rem] px-4 py-2 text-[16px] text-[var(--edge-live)]"
               >
                 delete
               </button>
               <button
                 type="button"
                 onClick={() => setConfirming(false)}
-                className="font-hand px-3 py-1.5 text-[16px] text-[var(--ink-muted)]"
+                className="font-hand min-h-[2.75rem] px-4 py-2 text-[16px] text-[var(--ink-muted)]"
               >
                 keep
               </button>
@@ -249,14 +268,15 @@ export function NodeEditor() {
             <button
               type="button"
               onClick={() => setConfirming(true)}
-              className="font-hand px-3 py-1.5 text-[16px] text-[var(--ink-faint)] hover:text-[var(--edge-live)]"
+              className="font-hand min-h-[2.75rem] px-4 py-2 text-[16px] text-[var(--ink-faint)] hover:text-[var(--edge-live)]"
             >
               delete
             </button>
           )}
         </footer>
       </aside>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

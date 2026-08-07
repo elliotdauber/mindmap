@@ -8,7 +8,7 @@ import { searchNodes } from "@/lib/graph/search";
 import { useGraph } from "./graph-context";
 
 export function SearchPalette() {
-  const { nodes, searchOpen, closeSearch, jumpToNode, open } = useGraph();
+  const { nodes, searchOpen, closeSearch, jumpToNode, open, isTouch } = useGraph();
 
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -69,7 +69,7 @@ export function SearchPalette() {
   }
 
   return createPortal(
-    <div className="search-overlay pointer-events-none fixed inset-0 z-[100] flex justify-center pt-[5.5rem]">
+    <div className="search-overlay pointer-events-none fixed inset-0 z-[100] flex justify-center px-4 pt-[max(4.5rem,calc(4.5rem+env(safe-area-inset-top)))]">
       <button
         type="button"
         aria-label="Close search"
@@ -88,7 +88,7 @@ export function SearchPalette() {
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search ideas…"
             aria-label="Search ideas"
-            className="font-hand w-full bg-transparent text-[20px] text-[var(--ink)] outline-none placeholder:text-[var(--ink-faint)]"
+            className="search-input font-hand w-full bg-transparent text-[20px] text-[var(--ink)] outline-none placeholder:text-[var(--ink-faint)]"
           />
         </div>
 
@@ -109,7 +109,7 @@ export function SearchPalette() {
                         closeSearch();
                         open(result.id);
                       }}
-                      className={`flex w-full flex-col gap-1 px-4 py-2.5 text-left transition-colors ${
+                      className={`flex min-h-[2.75rem] w-full flex-col gap-1 px-4 py-3 text-left transition-colors ${
                         index === activeIndex
                           ? "bg-black/[0.06]"
                           : "hover:bg-black/[0.04]"
@@ -145,7 +145,7 @@ export function SearchPalette() {
         )}
 
         <p className="mt-2 text-center font-hand text-[13px] text-[var(--ink-faint)]">
-          enter to jump · double-click to open
+          {isTouch ? "tap to jump" : "enter to jump · double-click to open"}
         </p>
       </div>
     </div>,

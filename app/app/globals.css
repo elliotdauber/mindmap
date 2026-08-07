@@ -387,6 +387,85 @@ body {
   }
 }
 
+/* ─────────────  mobile / touch  ───────────── */
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.canvas-shell {
+  touch-action: none;
+}
+
+.panel-safe-top {
+  margin-top: max(0.75rem, env(safe-area-inset-top)) !important;
+}
+
+.panel-safe-bottom {
+  margin-bottom: max(0.5rem, env(safe-area-inset-bottom)) !important;
+}
+
+@media (hover: none), (max-width: 640px) {
+  .node-shell.is-selected .node-actions {
+    opacity: 1 !important;
+  }
+
+  .node-actions .nodrag {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+    padding: 0.375rem;
+  }
+
+  .command-btn {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+    justify-content: center;
+  }
+
+  .command-btn-label,
+  .command-btn-shortcut {
+    display: none;
+  }
+
+  .command-divider {
+    display: none;
+  }
+
+  .editor-panel {
+    border-left: none;
+    max-width: none !important;
+    box-shadow: none;
+  }
+
+  .editor-panel textarea,
+  .search-input {
+    font-size: 16px !important;
+  }
+
+  .auth-input {
+    font-size: 16px;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .sketch-btn,
+  .sketch-btn-primary {
+    min-height: 2.75rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .edge-delete-btn {
+    height: 2.75rem !important;
+    width: 2.75rem !important;
+  }
+
+  .zoom-btn {
+    height: 2.75rem;
+    width: 2.75rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .react-flow__node,
   .node-card {

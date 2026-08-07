@@ -114,11 +114,11 @@ export function IdeaNode({ id, data, selected, variant }: IdeaNodeProps) {
                     strokeLinecap="round"
                   />
                 </IconButton>
-                <IconButton label="Open" onClick={() => open(id)}>
+                <IconButton label="Open details" onClick={() => open(id)}>
                   <path
-                    d="M6.4 3.6h-2a1 1 0 00-1 1v7a1 1 0 001 1h7a1 1 0 001-1v-2M9.2 3.6h3.2v3.2M12.4 3.6L7.6 8.4"
+                    d="M6.5 4.5l3.5 3.5-3.5 3.5"
                     stroke="currentColor"
-                    strokeWidth="1.3"
+                    strokeWidth="1.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />

@@ -4,30 +4,58 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
-import type { Connection, Edge, Node } from "@xyflow/react";
+import type { Edge, Node } from "@xyflow/react";
 import { createClient } from "@/lib/supabase/client";
-import type {
-  DbEdge,
-  DbNode,
-  GraphEdge,
-  NodeType,
-} from "@/lib/types/graph";
-import { dbEdgeToEdge, dbNodeToDisplayed, relayoutNodes } from "@/lib/graph/transform";
+import type { DbEdge, DbNode, GraphEdge, NodeType } from "@/lib/types/graph";
+import { dbEdgeToEdge, dbNodeToDisplayed } from "@/lib/graph/transform";
+import { routeEdges, type Rect } from "@/lib/graph/route";
+import {
+  NODE_HEIGHT,
+  NODE_WIDTH,
+  clusterLayout,
+} from "./layout/clusterLayout";
+
+export type GraphNode = {
+  id: string;
+  type: NodeType;
+  title: string;
+  body: string;
+};
 
 type GraphContextValue = {
+  nodeCount: number;
+  edgeCount: number;
+  isBusy: boolean;
+  /** True while the map is gliding into new positions after a structural change. */
+  isSettling: boolean;
+  selectedNodeId: string | null;
+  linkSourceId: string | null;
+  linkSourceType: NodeType | null;
+  isLinking: boolean;
+  isLinkableTarget: (id: string) => boolean;
+  hasLinkTargets: (id: string) => boolean;
+  openNode: GraphNode | null;
+  openNodeNeighbours: GraphNode[];
+  viewportFocusId: string | null;
+  addNode: (type: NodeType) => Promise<void>;
   updateNode: (
     id: string,
     updates: { title?: string; body?: string },
   ) => Promise<void>;
   deleteNode: (id: string) => Promise<void>;
-  addNode: (type: NodeType) => Promise<void>;
-  addEdge: (source: string, target: string) => Promise<void>;
   deleteEdge: (id: string) => Promise<void>;
-  isBusy: boolean;
+  deleteSelection: () => void;
+  startLink: (id: string) => void;
+  cancelLink: () => void;
+  open: (id: string) => void;
+  close: () => void;
+  consumeViewportFocus: () => void;
 };
 
 const GraphContext = createContext<GraphContextValue | null>(null);
@@ -40,19 +68,63 @@ export function useGraph() {
   return ctx;
 }
 
+type RenderProps = {
+  nodes: Node[];
+  edges: Edge[];
+  onNodeClick: (id: string) => void;
+  onEdgeClick: (id: string) => void;
+  onPaneClick: () => void;
+};
+
 type GraphProviderProps = {
   initialNodes: DbNode[];
   initialEdges: DbEdge[];
-  children: (props: {
-    nodes: Node[];
-    edges: Edge[];
-    setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
-    setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
-    onEdge: (edge: Connection) => void;
-    onNodesDelete: (deleted: Node[]) => void;
-    onEdgesDelete: (deleted: Edge[]) => void;
-  }) => ReactNode;
+  children: (props: RenderProps) => ReactNode;
 };
+
+/**
+ * Content is only ever related through a concept, so two content nodes may
+ * never be linked to each other directly.
+ */
+function isLinkAllowed(
+  nodes: GraphNode[],
+  sourceId: string,
+  targetId: string,
+) {
+  if (sourceId === targetId) return false;
+
+  const source = nodes.find((node) => node.id === sourceId);
+  const target = nodes.find((node) => node.id === targetId);
+  if (!source || !target) return false;
+
+  return !(source.type === "content" && target.type === "content");
+}
+
+/**
+ * Everything the placement depends on: which cards exist, what they are, and
+ * how they connect. Titles, bodies and selection are deliberately absent, so
+ * editing or clicking can never move the map.
+ */
+function structureKey(nodes: GraphNode[], edges: GraphEdge[]) {
+  const cards = nodes
+    .map((node) => `${node.id}:${node.type}`)
+    .sort()
+    .join(",");
+
+  const links = edges
+    .map((edge) =>
+      edge.source < edge.target
+        ? `${edge.source}>${edge.target}`
+        : `${edge.target}>${edge.source}`,
+    )
+    .sort()
+    .join(",");
+
+  return `${cards}|${links}`;
+}
+
+/** How long the cards take to glide once the layout has changed. */
+const SETTLE_MS = 520;
 
 export function GraphProvider({
   initialNodes,
@@ -60,112 +132,217 @@ export function GraphProvider({
   children,
 }: GraphProviderProps) {
   const supabase = useMemo(() => createClient(), []);
-  const [isBusy, setIsBusy] = useState(false);
 
-  const initialGraph = useMemo(
-    () => ({
-      nodes: initialNodes.map(dbNodeToDisplayed),
-      edges: initialEdges.map(dbEdgeToEdge),
+  const [nodes, setNodes] = useState<GraphNode[]>(() =>
+    initialNodes.map((row) => {
+      const displayed = dbNodeToDisplayed(row);
+      return {
+        id: displayed.id,
+        type: displayed.type,
+        title: displayed.data.title,
+        body: displayed.data.body ?? "",
+      };
     }),
-    [initialNodes, initialEdges],
+  );
+  const [edges, setEdges] = useState<GraphEdge[]>(() =>
+    initialEdges.map(dbEdgeToEdge),
   );
 
-  const [nodes, setNodes] = useState<Node[]>(() =>
-    relayoutNodes(initialGraph.nodes, initialGraph.edges),
-  );
-  const [edges, setEdges] = useState<Edge[]>(initialGraph.edges);
+  const [isBusy, setIsBusy] = useState(false);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const [linkSourceId, setLinkSourceId] = useState<string | null>(null);
+  const [openNodeId, setOpenNodeId] = useState<string | null>(null);
+  const [viewportFocusId, setViewportFocusId] = useState<string | null>(null);
 
-  const applyLayout = useCallback(
-    (nextNodes: Node[], nextEdges: GraphEdge[]) => {
-      const displayed = nextNodes.map((node) => ({
+  const nodesRef = useRef(nodes);
+  const edgesRef = useRef(edges);
+  const selectedNodeRef = useRef(selectedNodeId);
+  const selectedEdgeRef = useRef(selectedEdgeId);
+  const linkSourceRef = useRef(linkSourceId);
+
+  nodesRef.current = nodes;
+  edgesRef.current = edges;
+  selectedNodeRef.current = selectedNodeId;
+  selectedEdgeRef.current = selectedEdgeId;
+  linkSourceRef.current = linkSourceId;
+
+  const key = structureKey(nodes, edges);
+
+  // Placement is a pure function of the structure key, so it is recomputed only
+  // when a card or connection is actually added or removed.
+  const positions = useMemo(
+    () =>
+      clusterLayout(
+        nodesRef.current.map((node) => ({ id: node.id, type: node.type })),
+        edgesRef.current.map((edge) => ({
+          source: edge.source,
+          target: edge.target,
+        })),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [key],
+  );
+
+  const routes = useMemo(() => {
+    const rects: Rect[] = nodesRef.current.map((node) => {
+      const point = positions.get(node.id) ?? { x: 0, y: 0 };
+      return {
         id: node.id,
-        type: node.type as NodeType,
-        data: node.data as { title: string; body?: string },
-      }));
+        x: point.x,
+        y: point.y,
+        width: NODE_WIDTH,
+        height: NODE_HEIGHT,
+      };
+    });
 
-      setNodes(relayoutNodes(displayed, nextEdges));
-      setEdges(nextEdges);
-    },
-    [],
-  );
+    return routeEdges(rects, edgesRef.current);
+  }, [positions]);
+
+  // Connections are redrawn at their final geometry immediately while the cards
+  // glide, so they get softened for the length of that glide.
+  const [isSettling, setIsSettling] = useState(false);
+  const firstLayout = useRef(true);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (firstLayout.current) {
+      firstLayout.current = false;
+      return;
+    }
+
+    setIsSettling(true);
+    if (settleTimer.current) clearTimeout(settleTimer.current);
+    settleTimer.current = setTimeout(() => setIsSettling(false), SETTLE_MS);
+
+    return () => {
+      if (settleTimer.current) clearTimeout(settleTimer.current);
+    };
+  }, [positions]);
+
+  const startLink = useCallback((id: string) => {
+    setLinkSourceId(id);
+    setSelectedNodeId(id);
+    setSelectedEdgeId(null);
+    setOpenNodeId(null);
+  }, []);
+
+  const cancelLink = useCallback(() => {
+    setLinkSourceId(null);
+  }, []);
+
+  const open = useCallback((id: string) => {
+    setOpenNodeId(id);
+    setSelectedNodeId(id);
+    setSelectedEdgeId(null);
+    setLinkSourceId(null);
+  }, []);
+
+  const close = useCallback(() => {
+    setOpenNodeId(null);
+  }, []);
+
+  const consumeViewportFocus = useCallback(() => {
+    setViewportFocusId(null);
+  }, []);
 
   const addNode = useCallback(
     async (type: NodeType) => {
       setIsBusy(true);
 
+      const linkFrom = selectedNodeRef.current;
+
       const { data, error } = await supabase
         .from("nodes")
-        .insert({
-          type,
-          title: type === "content" ? "Untitled content" : "New concept",
-          body: type === "content" ? "Start writing…" : "",
-        })
+        .insert({ type, title: "", body: "" })
         .select()
         .single();
 
-      setIsBusy(false);
-
       if (error || !data) {
         console.error(error);
+        setIsBusy(false);
         return;
       }
 
-      const displayed = dbNodeToDisplayed(data as DbNode);
-      const nextNodes = [
-        ...nodes,
-        {
-          id: displayed.id,
-          type: displayed.type,
-          data: displayed.data,
-          position: { x: 0, y: 0 },
-        },
-      ];
+      const created = dbNodeToDisplayed(data as DbNode);
 
-      applyLayout(nextNodes, edges as GraphEdge[]);
+      const sourceType = linkFrom
+        ? nodesRef.current.find((node) => node.id === linkFrom)?.type
+        : undefined;
+      const autoLink =
+        Boolean(linkFrom) && !(sourceType === "content" && type === "content");
+
+      if (autoLink && linkFrom && linkFrom !== created.id) {
+        const { data: edgeRow, error: edgeError } = await supabase
+          .from("edges")
+          .insert({ from_node_id: linkFrom, to_node_id: created.id })
+          .select()
+          .single();
+
+        if (edgeError) {
+          console.error(edgeError);
+        } else if (edgeRow) {
+          setEdges((current) => [...current, dbEdgeToEdge(edgeRow as DbEdge)]);
+        }
+      }
+
+      setNodes((current) => [
+        ...current,
+        {
+          id: created.id,
+          type: created.type,
+          title: created.data.title,
+          body: created.data.body ?? "",
+        },
+      ]);
+
+      setSelectedNodeId(created.id);
+      setSelectedEdgeId(null);
+      setLinkSourceId(null);
+      setOpenNodeId(created.id);
+      setViewportFocusId(created.id);
+      setIsBusy(false);
     },
-    [applyLayout, edges, nodes, supabase],
+    [supabase],
   );
 
   const updateNode = useCallback(
     async (id: string, updates: { title?: string; body?: string }) => {
-      const node = nodes.find((n) => n.id === id);
+      const previous = nodesRef.current;
+      const node = previous.find((candidate) => candidate.id === id);
       if (!node) return;
 
-      const nextData = { ...node.data, ...updates };
-
-      setNodes((current) =>
-        current.map((n) =>
-          n.id === id ? { ...n, data: nextData } : n,
-        ),
-      );
+      const next = { ...node, ...updates };
+      setNodes(previous.map((card) => (card.id === id ? next : card)));
 
       const { error } = await supabase
         .from("nodes")
-        .update({
-          title: nextData.title,
-          ...(node.type === "content" ? { body: nextData.body ?? "" } : {}),
-        })
+        .update({ title: next.title, body: next.body })
         .eq("id", id);
 
       if (error) {
         console.error(error);
-        setNodes(nodes);
+        setNodes(previous);
       }
     },
-    [nodes, supabase],
+    [supabase],
   );
 
   const deleteNode = useCallback(
     async (id: string) => {
-      const previousNodes = nodes;
-      const previousEdges = edges;
+      const previousNodes = nodesRef.current;
+      const previousEdges = edgesRef.current;
 
-      const nextEdges = (edges as GraphEdge[]).filter(
-        (edge) => edge.source !== id && edge.target !== id,
+      setNodes(previousNodes.filter((node) => node.id !== id));
+      setEdges(
+        previousEdges.filter(
+          (edge) => edge.source !== id && edge.target !== id,
+        ),
       );
-      const nextNodes = nodes.filter((node) => node.id !== id);
 
-      applyLayout(nextNodes, nextEdges);
+      if (selectedNodeRef.current === id) setSelectedNodeId(null);
+      if (linkSourceRef.current === id) setLinkSourceId(null);
+      setOpenNodeId((current) => (current === id ? null : current));
 
       const { error } = await supabase.from("nodes").delete().eq("id", id);
 
@@ -175,23 +352,50 @@ export function GraphProvider({
         setEdges(previousEdges);
       }
     },
-    [applyLayout, edges, nodes, supabase],
+    [supabase],
   );
 
-  const addEdge = useCallback(
-    async (source: string, target: string) => {
-      if (source === target) return;
+  const deleteEdge = useCallback(
+    async (id: string) => {
+      const previousEdges = edgesRef.current;
+      setEdges(previousEdges.filter((edge) => edge.id !== id));
 
-      const exists = (edges as GraphEdge[]).some(
-        (edge) => edge.source === source && edge.target === target,
+      if (selectedEdgeRef.current === id) setSelectedEdgeId(null);
+
+      const { error } = await supabase.from("edges").delete().eq("id", id);
+
+      if (error) {
+        console.error(error);
+        setEdges(previousEdges);
+      }
+    },
+    [supabase],
+  );
+
+  const linkTo = useCallback(
+    async (targetId: string) => {
+      const source = linkSourceRef.current;
+      setLinkSourceId(null);
+
+      if (!source || !isLinkAllowed(nodesRef.current, source, targetId)) return;
+
+      // Connections read as undirected in the UI, so a link in either stored
+      // direction already represents this pair.
+      const duplicate = edgesRef.current.some(
+        (edge) =>
+          (edge.source === source && edge.target === targetId) ||
+          (edge.source === targetId && edge.target === source),
       );
-      if (exists) return;
+
+      setSelectedNodeId(targetId);
+
+      if (duplicate) return;
 
       setIsBusy(true);
 
       const { data, error } = await supabase
         .from("edges")
-        .insert({ from_node_id: source, to_node_id: target })
+        .insert({ from_node_id: source, to_node_id: targetId })
         .select()
         .single();
 
@@ -202,86 +406,182 @@ export function GraphProvider({
         return;
       }
 
-      const newEdge = dbEdgeToEdge(data as DbEdge);
-      applyLayout(nodes, [...(edges as GraphEdge[]), newEdge]);
-    },
-    [applyLayout, edges, nodes, supabase],
-  );
-
-  const deleteEdge = useCallback(
-    async (id: string) => {
-      const previousEdges = edges;
-
-      const nextEdges = (edges as GraphEdge[]).filter((edge) => edge.id !== id);
-      applyLayout(nodes, nextEdges);
-
-      const { error } = await supabase.from("edges").delete().eq("id", id);
-
-      if (error) {
-        console.error(error);
-        setEdges(previousEdges);
-      }
-    },
-    [applyLayout, edges, nodes, supabase],
-  );
-
-  const onEdge = useCallback(
-    (edge: Connection) => {
-      if (!edge.source || !edge.target) return;
-      void addEdge(edge.source, edge.target);
-    },
-    [addEdge],
-  );
-
-  const onNodesDelete = useCallback(
-    (deleted: Node[]) => {
-      const deletedIds = new Set(deleted.map((node) => node.id));
-
-      setEdges((current) =>
-        current.filter(
-          (edge) =>
-            !deletedIds.has(edge.source) && !deletedIds.has(edge.target),
-        ),
-      );
-
-      for (const node of deleted) {
-        void supabase.from("nodes").delete().eq("id", node.id);
-      }
+      setEdges((current) => [...current, dbEdgeToEdge(data as DbEdge)]);
     },
     [supabase],
   );
 
-  const onEdgesDelete = useCallback(
-    (deleted: Edge[]) => {
-      for (const edge of deleted) {
-        void supabase.from("edges").delete().eq("id", edge.id);
+  const onNodeClick = useCallback(
+    (id: string) => {
+      const source = linkSourceRef.current;
+
+      if (source) {
+        if (source === id) {
+          setLinkSourceId(null);
+          return;
+        }
+
+        // Stay in link mode when an ineligible node is clicked so the pick can
+        // be retried without starting over.
+        if (!isLinkAllowed(nodesRef.current, source, id)) return;
+
+        void linkTo(id);
+        return;
       }
+
+      setSelectedNodeId(id);
+      setSelectedEdgeId(null);
     },
-    [supabase],
+    [linkTo],
   );
 
-  const value = useMemo(
+  const onEdgeClick = useCallback((id: string) => {
+    setSelectedEdgeId(id);
+    setSelectedNodeId(null);
+    setLinkSourceId(null);
+  }, []);
+
+  const onPaneClick = useCallback(() => {
+    setSelectedNodeId(null);
+    setSelectedEdgeId(null);
+    setLinkSourceId(null);
+  }, []);
+
+  const deleteSelection = useCallback(() => {
+    if (selectedEdgeRef.current) {
+      void deleteEdge(selectedEdgeRef.current);
+      return;
+    }
+
+    if (selectedNodeRef.current) {
+      void deleteNode(selectedNodeRef.current);
+    }
+  }, [deleteEdge, deleteNode]);
+
+  const flowNodes = useMemo<Node[]>(
+    () =>
+      nodes.map((node) => ({
+        id: node.id,
+        type: node.type,
+        position: positions.get(node.id) ?? { x: 0, y: 0 },
+        // Fixed dimensions, so React Flow never has to measure the card and the
+        // layout can't be affected by its contents.
+        width: NODE_WIDTH,
+        height: NODE_HEIGHT,
+        data: { title: node.title, body: node.body },
+        selected: node.id === selectedNodeId,
+        draggable: false,
+        connectable: false,
+        deletable: false,
+      })),
+    [nodes, positions, selectedNodeId],
+  );
+
+  const flowEdges = useMemo<Edge[]>(
+    () =>
+      edges.map((edge) => ({
+        ...edge,
+        data: routes.get(edge.id),
+        selected: edge.id === selectedEdgeId,
+      })),
+    [edges, routes, selectedEdgeId],
+  );
+
+  const linkSourceType = useMemo(() => {
+    if (!linkSourceId) return null;
+    return nodes.find((node) => node.id === linkSourceId)?.type ?? null;
+  }, [linkSourceId, nodes]);
+
+  const isLinkableTarget = useCallback(
+    (id: string) =>
+      linkSourceId !== null && isLinkAllowed(nodes, linkSourceId, id),
+    [linkSourceId, nodes],
+  );
+
+  const hasLinkTargets = useCallback(
+    (id: string) => nodes.some((node) => isLinkAllowed(nodes, id, node.id)),
+    [nodes],
+  );
+
+  const openNode = useMemo(
+    () => nodes.find((node) => node.id === openNodeId) ?? null,
+    [nodes, openNodeId],
+  );
+
+  const openNodeNeighbours = useMemo(() => {
+    if (!openNodeId) return [];
+
+    const ids = new Set(
+      edges
+        .filter(
+          (edge) => edge.source === openNodeId || edge.target === openNodeId,
+        )
+        .map((edge) => (edge.source === openNodeId ? edge.target : edge.source)),
+    );
+
+    return nodes.filter((node) => ids.has(node.id));
+  }, [edges, nodes, openNodeId]);
+
+  const value = useMemo<GraphContextValue>(
     () => ({
+      nodeCount: nodes.length,
+      edgeCount: edges.length,
+      isBusy,
+      isSettling,
+      selectedNodeId,
+      linkSourceId,
+      linkSourceType,
+      isLinking: linkSourceId !== null,
+      isLinkableTarget,
+      hasLinkTargets,
+      openNode,
+      openNodeNeighbours,
+      viewportFocusId,
       addNode,
       updateNode,
       deleteNode,
-      addEdge,
       deleteEdge,
-      isBusy,
+      deleteSelection,
+      startLink,
+      cancelLink,
+      open,
+      close,
+      consumeViewportFocus,
     }),
-    [addEdge, addNode, deleteEdge, deleteNode, isBusy, updateNode],
+    [
+      addNode,
+      cancelLink,
+      close,
+      consumeViewportFocus,
+      deleteEdge,
+      deleteNode,
+      deleteSelection,
+      edges.length,
+      hasLinkTargets,
+      isBusy,
+      isLinkableTarget,
+      isSettling,
+      linkSourceId,
+      linkSourceType,
+      nodes.length,
+      open,
+      openNode,
+      openNodeNeighbours,
+      selectedNodeId,
+      startLink,
+      updateNode,
+      viewportFocusId,
+    ],
   );
 
   return (
     <GraphContext.Provider value={value}>
       {children({
-        nodes,
-        edges,
-        setNodes,
-        setEdges,
-        onEdge,
-        onNodesDelete,
-        onEdgesDelete,
+        nodes: flowNodes,
+        edges: flowEdges,
+        onNodeClick,
+        onEdgeClick,
+        onPaneClick,
       })}
     </GraphContext.Provider>
   );

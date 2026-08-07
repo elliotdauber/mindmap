@@ -1,25 +1,32 @@
 "use client";
 
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { AuthField, AuthShell } from "@/components/auth/AuthShell";
 
 export default function Signup() {
   const router = useRouter();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
   async function signup() {
-    const supabase = createClient();
+    setPending(true);
+    setError(null);
 
-    const { error } = await supabase.auth.signUp({
+    const supabase = createClient();
+    const { error: authError } = await supabase.auth.signUp({
       email,
       password,
     });
 
-    if (error) {
-      alert(error.message);
+    if (authError) {
+      setError(authError.message);
+      setPending(false);
       return;
     }
 
@@ -27,41 +34,51 @@ export default function Signup() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#faf7f2]">
-      <div className="w-full max-w-sm">
-        <h1 className="text-3xl font-semibold text-stone-800">
-          Create account
-        </h1>
-
-        <input
-          className="mt-8 w-full rounded-xl border p-3"
-          placeholder="Email"
+    <AuthShell
+      title="Start a map"
+      subtitle="A quiet place to connect what you're learning."
+      footer={
+        <>
+          Already registered?{" "}
+          <Link href="/login" className="text-[#a9bcff] hover:underline">
+            Sign in
+          </Link>
+        </>
+      }
+    >
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void signup();
+        }}
+      >
+        <AuthField
+          label="Email"
+          type="email"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={setEmail}
+          autoComplete="email"
         />
-
-        <input
-          className="mt-3 w-full rounded-xl border p-3"
-          placeholder="Password"
+        <AuthField
+          label="Password"
           type="password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={setPassword}
+          autoComplete="new-password"
         />
 
-        <button
-          onClick={signup}
-          className="mt-5 w-full rounded-xl bg-stone-900 py-3 text-white"
-        >
-          Create account
-        </button>
+        {error && (
+          <p className="mt-1 mb-3 text-[12.5px] text-[#ff8f8f]">{error}</p>
+        )}
 
-        <p className="mt-5 text-sm text-stone-400">
-          Already registered?{" "}
-          <a href="/login" className="underline">
-            Login
-          </a>
-        </p>
-      </div>
-    </div>
+        <button
+          type="submit"
+          disabled={pending}
+          className="mt-2 w-full rounded-xl bg-[#f2f1ee] py-2.5 text-[13.5px] font-medium text-[#0b0d10] transition-all hover:bg-white active:scale-[0.99] disabled:opacity-60"
+        >
+          {pending ? "Creating account…" : "Create account"}
+        </button>
+      </form>
+    </AuthShell>
   );
 }

@@ -1,25 +1,32 @@
 "use client";
 
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { AuthField, AuthShell } from "@/components/auth/AuthShell";
 
 export default function Login() {
   const router = useRouter();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
   async function login() {
-    const supabase = createClient();
+    setPending(true);
+    setError(null);
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const supabase = createClient();
+    const { error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    if (error) {
-      alert(error.message);
+    if (authError) {
+      setError(authError.message);
+      setPending(false);
       return;
     }
 
@@ -27,30 +34,51 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#faf7f2]">
-      <div className="w-full max-w-sm">
-        <h1 className="text-3xl font-semibold text-stone-800">Welcome back</h1>
-
-        <input
-          className="mt-8 w-full rounded-xl border p-3"
-          placeholder="Email"
-          onChange={(e) => setEmail(e.target.value)}
+    <AuthShell
+      title="Welcome back"
+      subtitle="Pick up where your thinking left off."
+      footer={
+        <>
+          No account yet?{" "}
+          <Link href="/signup" className="text-[#a9bcff] hover:underline">
+            Create one
+          </Link>
+        </>
+      }
+    >
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void login();
+        }}
+      >
+        <AuthField
+          label="Email"
+          type="email"
+          value={email}
+          onChange={setEmail}
+          autoComplete="email"
         />
-
-        <input
-          className="mt-3 w-full rounded-xl border p-3"
-          placeholder="Password"
+        <AuthField
+          label="Password"
           type="password"
-          onChange={(e) => setPassword(e.target.value)}
+          value={password}
+          onChange={setPassword}
+          autoComplete="current-password"
         />
+
+        {error && (
+          <p className="mt-1 mb-3 text-[12.5px] text-[#ff8f8f]">{error}</p>
+        )}
 
         <button
-          onClick={login}
-          className="mt-5 w-full rounded-xl bg-stone-900 py-3 text-white"
+          type="submit"
+          disabled={pending}
+          className="mt-2 w-full rounded-xl bg-[#f2f1ee] py-2.5 text-[13.5px] font-medium text-[#0b0d10] transition-all hover:bg-white active:scale-[0.99] disabled:opacity-60"
         >
-          Login
+          {pending ? "Signing in…" : "Sign in"}
         </button>
-      </div>
-    </div>
+      </form>
+    </AuthShell>
   );
 }

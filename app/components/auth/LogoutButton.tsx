@@ -2,24 +2,27 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 export default function LogoutButton() {
   const router = useRouter();
+  const [pending, setPending] = useState(false);
 
   async function logout() {
+    setPending(true);
     const supabase = createClient();
-
     await supabase.auth.signOut();
-
     router.push("/");
   }
 
   return (
     <button
-      onClick={logout}
-      className="rounded-full border border-stone-200/80 bg-white/90 px-4 py-2 text-sm text-stone-600 shadow-sm backdrop-blur-sm transition-colors hover:border-stone-300 hover:bg-stone-50"
+      type="button"
+      onClick={() => void logout()}
+      disabled={pending}
+      className="glass glass-button rounded-xl px-3.5 py-2 text-[11.5px] font-medium disabled:opacity-50"
     >
-      Logout
+      {pending ? "Signing out…" : "Sign out"}
     </button>
   );
 }

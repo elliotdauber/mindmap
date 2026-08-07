@@ -1,15 +1,12 @@
 "use client";
 
-import {
-  BaseEdge,
-  EdgeLabelRenderer,
-  getSmoothStepPath,
-  type EdgeProps,
-} from "@xyflow/react";
+import { BaseEdge, EdgeLabelRenderer, type EdgeProps } from "@xyflow/react";
 import { useGraph } from "../graph-context";
+import type { EdgeRoute } from "@/lib/types/graph";
 
 export default function RelationshipEdge({
   id,
+  data,
   sourceX,
   sourceY,
   targetX,
@@ -17,24 +14,17 @@ export default function RelationshipEdge({
   selected,
 }: EdgeProps) {
   const { deleteEdge } = useGraph();
+  const route = data as EdgeRoute | undefined;
 
-  const [path, labelX, labelY] = getSmoothStepPath({
-    sourceX,
-    sourceY,
-    targetX,
-    targetY,
-  });
+  // The router pre-computes geometry that steers clear of every card; the
+  // straight fallback only applies before the first layout pass lands.
+  const path = route?.path ?? `M ${sourceX},${sourceY} L ${targetX},${targetY}`;
+  const labelX = route?.labelX ?? (sourceX + targetX) / 2;
+  const labelY = route?.labelY ?? (sourceY + targetY) / 2;
 
   return (
     <>
-      <BaseEdge
-        id={id}
-        path={path}
-        style={{
-          stroke: selected ? "#a8a29e" : "#d6c7b8",
-          strokeWidth: selected ? 3 : 2,
-        }}
-      />
+      <BaseEdge id={id} path={path} interactionWidth={22} className="edge-base" />
 
       {selected && (
         <EdgeLabelRenderer>
@@ -43,12 +33,21 @@ export default function RelationshipEdge({
             style={{
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
             }}
-            onClick={() => void deleteEdge(id)}
-            className="nodrag nopan absolute flex h-6 w-6 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-500 shadow-sm transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+            onClick={(event) => {
+              event.stopPropagation();
+              void deleteEdge(id);
+            }}
+            className="glass nodrag nopan pointer-events-auto absolute flex h-7 w-7 items-center justify-center rounded-full text-[#c9c7c2] transition-all hover:scale-105 hover:text-[#ff8f8f]"
             title="Remove connection"
+            aria-label="Remove connection"
           >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
-              <path d="M2 5h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden>
+              <path
+                d="M2.5 5.5h6"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+              />
             </svg>
           </button>
         </EdgeLabelRenderer>

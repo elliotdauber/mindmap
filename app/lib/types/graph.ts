@@ -27,8 +27,17 @@ export type DisplayedNode = {
   data: NodeData;
 };
 
+/** Pre-computed geometry so an edge never has to cross a card. */
+export type EdgeRoute = {
+  path: string;
+  labelX: number;
+  labelY: number;
+};
+
 export type GraphEdge = {
   id: string;
   source: string;
   target: string;
+  type: "relationship";
+  data?: EdgeRoute;
 };

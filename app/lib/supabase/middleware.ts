@@ -35,8 +35,25 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  // Refreshes the access token when needed so the session can live for a week.
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const pathname = request.nextUrl.pathname;
+  const isGuestRoute =
+    pathname === "/" || pathname === "/login" || pathname === "/signup";
+
+  if (user && isGuestRoute) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/map";
+    const redirect = NextResponse.redirect(url);
+
+    response.cookies.getAll().forEach((cookie) => {
+      redirect.cookies.set(cookie.name, cookie.value, cookie);
+    });
+
+    return redirect;
+  }
 
   return response;
 }

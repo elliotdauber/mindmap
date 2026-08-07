@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
+import { sessionCookieOptions, stampSessionCookies } from "./session";
+
 export async function createClient() {
   const cookieStore = await cookies();
 
@@ -15,14 +17,15 @@ export async function createClient() {
 
         setAll(cookiesToSet) {
           try {
-            cookiesToSet.forEach(({ name, value, options }) =>
+            stampSessionCookies(cookiesToSet).forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options),
             );
           } catch {
-            // Server component
+            // Server component — middleware keeps the session fresh.
           }
         },
       },
+      cookieOptions: sessionCookieOptions,
     },
   );
 }

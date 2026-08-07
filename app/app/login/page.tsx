@@ -36,7 +36,7 @@ export default function Login() {
   return (
     <AuthShell
       title="Welcome back"
-      subtitle="Pick up where your thinking left off."
+      subtitle="Pick up where your thinking left off. You'll stay signed in for a week on this device."
       footer={
         <>
           No account yet?{" "}

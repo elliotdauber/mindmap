@@ -271,7 +271,7 @@ export function GraphProvider({
     if (!nodesRef.current.some((node) => node.id === id)) return;
 
     setSearchOpen(false);
-    setOpenNodeId(null);
+    setOpenNodeId(id);
     setSelectedNodeId(id);
     setSelectedEdgeId(null);
     setLinkSourceId(null);

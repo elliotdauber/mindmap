@@ -8,7 +8,7 @@ import { searchNodes } from "@/lib/graph/search";
 import { useGraph } from "./graph-context";
 
 export function SearchPalette() {
-  const { nodes, searchOpen, closeSearch, jumpToNode, open, isTouch } = useGraph();
+  const { nodes, searchOpen, closeSearch, jumpToNode } = useGraph();
 
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -105,10 +105,6 @@ export function SearchPalette() {
                     <button
                       type="button"
                       onClick={() => pick(result.id)}
-                      onDoubleClick={() => {
-                        closeSearch();
-                        open(result.id);
-                      }}
                       className={`flex min-h-[2.75rem] w-full flex-col gap-1 px-4 py-3 text-left transition-colors ${
                         index === activeIndex
                           ? "bg-black/[0.06]"
@@ -145,7 +141,7 @@ export function SearchPalette() {
         )}
 
         <p className="mt-2 text-center font-hand text-[13px] text-[var(--ink-faint)]">
-          {isTouch ? "tap to jump" : "enter to jump · double-click to open"}
+          enter to open
         </p>
       </div>
     </div>,
